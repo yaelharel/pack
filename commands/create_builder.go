@@ -1,8 +1,13 @@
 package commands
 
 import (
+	"context"
 	"fmt"
+	"github.com/buildpack/pack/container"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 
@@ -14,6 +19,7 @@ import (
 	"github.com/buildpack/pack/builder"
 	"github.com/buildpack/pack/logging"
 	"github.com/buildpack/pack/style"
+	dcontainer "github.com/docker/docker/api/types/container"
 )
 
 type CreateBuilderFlags struct {
@@ -30,8 +36,8 @@ func CreateBuilder(logger *logging.Logger, client PackClient) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Short: "Create builder image",
 		RunE: logError(logger, func(cmd *cobra.Command, args []string) error {
-			if runtime.GOOS == "windows" {
-				return fmt.Errorf("%s is not implemented on Windows", style.Symbol("create-builder"))
+			if runtime.GOOS == "windows" || true {
+				return runForWindows(logger, ctx)
 			}
 			builderConfig, err := readBuilderConfig(flags.BuilderTomlPath)
 			if err != nil {
@@ -57,6 +63,46 @@ func CreateBuilder(logger *logging.Logger, client PackClient) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.Publish, "publish", false, "Publish to registry")
 	AddHelpFlag(cmd, "create-builder")
 	return cmd
+}
+
+func runForWindows(logger *logging.Logger, ctx context.Context) error {
+	ctrConf := &dcontainer.Config{
+		User:  "root",
+		Image: "cnbs/build:0.0.1-rc.3", // TODO: Find better/smaller image, also fetch it
+	}
+
+	me, err := os.Executable()
+	if err != nil {
+		return errors.Wrap(err, "getting pack executable")
+	}
+
+	hostConf := &dcontainer.HostConfig{
+		Binds: []string{
+			me+":/pack:",
+			"/var/run/docker.sock:/var/run/docker.sock",
+			// fmt.Sprintf("%s:%s", l.LayersVolume, layersDir),
+			// fmt.Sprintf("%s:%s", l.AppVolume, appDir),
+		},
+	}
+	ctrConf.Cmd = append([]string{"/pack"}, os.Args...)
+
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
+	if err != nil {
+		return errors.Wrap(err, "create-builder docker client create")
+	}
+
+	ctr, err := dockerClient.ContainerCreate(ctx, ctrConf, hostConf, nil, "")
+	if err != nil {
+		return errors.Wrap(err, "create-builder container create")
+	}
+	defer dockerClient.ContainerRemove(context.Background(), ctr.ID, types.ContainerRemoveOptions{Force: true})
+	return container.Run(
+		ctx,
+		dockerClient,
+		ctr.ID,
+		logger.RawWriter(),
+		logger.RawErrorWriter(),
+	)
 }
 
 func readBuilderConfig(path string) (builder.Config, error) {
