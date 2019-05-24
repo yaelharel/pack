@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
@@ -30,9 +31,6 @@ func CreateBuilder(logger logging.Logger, client PackClient) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Short: "Create builder image",
 		RunE: logError(logger, func(cmd *cobra.Command, args []string) error {
-			if runtime.GOOS == "windows" {
-				return fmt.Errorf("%s is not implemented on Windows", style.Symbol("create-builder"))
-			}
 			builderConfig, err := readBuilderConfig(flags.BuilderTomlPath)
 			if err != nil {
 				return errors.Wrap(err, "invalid builder toml")
@@ -71,6 +69,11 @@ func readBuilderConfig(path string) (builder.Config, error) {
 	}
 
 	for i, bp := range builderConfig.Buildpacks {
+		if runtime.GOOS == "windows" {
+			if filepath.Ext(bp.URI) != ".tgz" {
+				return builder.Config{}, fmt.Errorf("buildpack %s: Windows only supports .tgz-based buildpacks", bp.ID)
+			}
+		}
 		uri, err := transformRelativePath(bp.URI, builderDir)
 		if err != nil {
 			return builder.Config{}, errors.Wrap(err, "transforming buildpack URI")
@@ -96,7 +99,7 @@ func transformRelativePath(uri, relativeTo string) (string, error) {
 	}
 	if parsed.Scheme == "" {
 		if !filepath.IsAbs(parsed.Path) {
-			return fmt.Sprintf("file://" + filepath.Join(relativeTo, parsed.Path)), nil
+			return strings.Replace(fmt.Sprintf("file://"+filepath.Join(relativeTo, parsed.Path)), `\`, `/`, -1), nil
 		}
 	}
 	return uri, nil
