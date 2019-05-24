@@ -239,8 +239,8 @@ func (c *Client) processBuildpacks(buildpacks []string) ([]buildpack.Buildpack, 
 	var bps []buildpack.Buildpack
 	for _, bp := range buildpacks {
 		if isFetchableBuildpack(bp) {
-			if runtime.GOOS == "windows" {
-				return nil, builder.GroupMetadata{}, fmt.Errorf("directory buildpacks are not implemented on windows")
+			if runtime.GOOS == "windows" && filepath.Ext(bp) != ".tgz" {
+				return []buildpack.Buildpack{}, builder.GroupMetadata{}, fmt.Errorf("buildpack %s: Windows only supports .tgz-based buildpacks", bp)
 			}
 			c.logger.Debugf("fetching buildpack from %s", style.Symbol(bp))
 			fetchedBP, err := c.buildpackFetcher.FetchBuildpack(bp)
@@ -267,10 +267,12 @@ func isFetchableBuildpack(path string) bool {
 		return false
 	}
 
-	if bpURL.Scheme == "" || bpURL.Scheme == "file" || bpURL.Scheme == "http" || bpURL.Scheme == "https" {
-		if filepath.Ext(path) == ".tgz" {
-			return true
-		}
+	if bpURL.Scheme == "" || bpURL.Scheme == "file" {
+		return true
+	}
+
+	if (bpURL.Scheme == "http" || bpURL.Scheme == "https") && filepath.Ext(path) == ".tgz" {
+		return true
 	}
 
 	return false
