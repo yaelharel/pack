@@ -499,36 +499,50 @@ func testBuild(t *testing.T, when spec.G, it spec.S) {
 				)
 			})
 
-			when("buildpacks include uris", func() {
-				it.Before(func() {
-					if runtime.GOOS == "windows" {
-						t.Skip("buildpack directories are not implemented on windows")
-					}
-				})
+			when("buildpacks include URIs", func() {
+				if runtime.GOOS == "windows" {
+					when("windows", func() {
+						it("only allows tgz buildpacks", func() {
+							err := subject.Build(context.TODO(), pack.BuildOptions{
+								Image:      "some/app",
+								ClearCache: true,
+								Buildpacks: []string{
+									"buildpack.id@buildpack.version",
+									filepath.Join("testdata", "buildpack"),
+								},
+							})
 
-				it("buildpacks are added to ephemeral builder", func() {
-					h.AssertNil(t, subject.Build(context.TODO(), pack.BuildOptions{
-						Image:      "some/app",
-						ClearCache: true,
-						Buildpacks: []string{
-							"buildpack.id@buildpack.version",
-							filepath.Join("testdata", "buildpack"),
-						},
-					}))
-					h.AssertEq(t, fakeLifecycle.Opts.Builder.Name(), defaultBuilderImage.Name())
-					bldr, err := builder.GetBuilder(defaultBuilderImage)
-					h.AssertNil(t, err)
-					h.AssertEq(t, bldr.GetOrder(), []builder.GroupMetadata{
-						{Buildpacks: []builder.GroupBuildpack{
-							{ID: "buildpack.id", Version: "buildpack.version"},
+							h.AssertError(t, err, fmt.Sprintf("buildpack '%s': Windows only supports .tgz-based buildpacks", filepath.Join("testdata", "buildpack")))
+						})
+					})
+				} else {
+					it("buildpacks are added to ephemeral builder", func() {
+						err := subject.Build(context.TODO(), pack.BuildOptions{
+							Image:      "some/app",
+							ClearCache: true,
+							Buildpacks: []string{
+								"buildpack.id@buildpack.version",
+								filepath.Join("testdata", "buildpack"),
+							},
+						})
+
+						h.AssertNil(t, err)
+						h.AssertEq(t, fakeLifecycle.Opts.Builder.Name(), defaultBuilderImage.Name())
+						bldr, err := builder.GetBuilder(defaultBuilderImage)
+						h.AssertNil(t, err)
+						h.AssertEq(t, bldr.GetOrder(), []builder.GroupMetadata{
+							{Buildpacks: []builder.GroupBuildpack{
+								{ID: "buildpack.id", Version: "buildpack.version"},
+								{ID: "some-buildpack-id", Version: "some-buildpack-version"},
+							}},
+						})
+						h.AssertEq(t, bldr.GetBuildpacks(), []builder.BuildpackMetadata{
+							{ID: "buildpack.id", Version: "buildpack.version", Latest: true},
 							{ID: "some-buildpack-id", Version: "some-buildpack-version"},
-						}},
+						})
+
 					})
-					h.AssertEq(t, bldr.GetBuildpacks(), []builder.BuildpackMetadata{
-						{ID: "buildpack.id", Version: "buildpack.version", Latest: true},
-						{ID: "some-buildpack-id", Version: "some-buildpack-version"},
-					})
-				})
+				}
 
 				// TODO: support other uris
 			})
