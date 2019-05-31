@@ -4,10 +4,10 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
-	"golang.org/x/tools/go/ssa/interp/testdata/src/runtime"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/Masterminds/semver"
@@ -242,12 +242,19 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 
 		if runtime.GOOS == "windows" {
 			when("windows", func() {
-				it.Focus("only allows tgz buildpacks", func() {
+				it("only allows tgz buildpacks", func() {
 					opts.BuilderConfig.Buildpacks[0].URI = "some/buildpack/dir"
 
 					err := subject.CreateBuilder(context.TODO(), opts)
-					h.AssertError(t, err, "foo")
+					h.AssertError(t, err, "buildpack 'bp.one': Windows only supports .tgz-based buildpacks")
 				})
+			})
+		} else {
+			it("supports directory buildpacks", func() {
+				opts.BuilderConfig.Buildpacks[0].URI = "some/buildpack/dir"
+
+				err := subject.CreateBuilder(context.TODO(), opts)
+				h.AssertNil(t, err)
 			})
 		}
 	})

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -69,11 +68,6 @@ func readBuilderConfig(path string) (builder.Config, error) {
 	}
 
 	for i, bp := range builderConfig.Buildpacks {
-		if runtime.GOOS == "windows" {
-			if filepath.Ext(bp.URI) != ".tgz" {
-				return builder.Config{}, fmt.Errorf("buildpack %s: Windows only supports .tgz-based buildpacks", bp.ID)
-			}
-		}
 		uri, err := transformRelativePath(bp.URI, builderDir)
 		if err != nil {
 			return builder.Config{}, errors.Wrap(err, "transforming buildpack URI")
