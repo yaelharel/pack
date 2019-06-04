@@ -300,7 +300,7 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 					h.AssertOnTarEntry(t, layerTar, "/buildpacks/tgz-buildpack-id/tgz-buildpack-version/buildpack-file",
 						h.ContentEquals("buildpack-contents"),
 						h.HasOwnerAndGroup(1234, 4321),
-						h.HasFileMode(0654),
+						h.HasFileMode(0644),
 					)
 
 					layerTar, err = baseImage.FindLayerWithPath("/buildpacks/latest-buildpack-id/latest-buildpack-version")
@@ -308,7 +308,7 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 					h.AssertOnTarEntry(t, layerTar, "/buildpacks/latest-buildpack-id/latest-buildpack-version/buildpack-file",
 						h.ContentEquals("buildpack-contents"),
 						h.HasOwnerAndGroup(1234, 4321),
-						h.HasFileMode(0654),
+						h.HasFileMode(0644),
 					)
 
 					if runtime.GOOS != "windows" {
@@ -317,7 +317,7 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 						h.AssertOnTarEntry(t, layerTar, "/buildpacks/dir-buildpack-id/dir-buildpack-version/buildpack-file",
 							h.ContentEquals("buildpack-contents"),
 							h.HasOwnerAndGroup(1234, 4321),
-							h.HasFileMode(0654),
+							h.HasFileMode(0644),
 						)
 					}
 				})
