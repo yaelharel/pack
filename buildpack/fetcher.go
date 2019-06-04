@@ -1,11 +1,13 @@
 package buildpack
 
 import (
-	"github.com/BurntSushi/toml"
-	"github.com/buildpack/pack/internal/archive"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"path/filepath"
+
+	"github.com/BurntSushi/toml"
+	"github.com/pkg/errors"
+
+	"github.com/buildpack/pack/internal/archive"
 )
 
 //go:generate mockgen -package mocks -destination mocks/downloader.go github.com/buildpack/pack/lifecycle Downloader

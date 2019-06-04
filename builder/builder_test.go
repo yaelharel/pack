@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/Masterminds/semver"
@@ -260,21 +261,6 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 			when("buildpack has matching stack", func() {
 				it.Before(func() {
 					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
-						ID:      "dir-buildpack-id",
-						Version: "dir-buildpack-version",
-						Path:    filepath.Join("testdata", "buildpack"),
-						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
-					}))
-
-					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
-						ID:      "latest-buildpack-id",
-						Version: "latest-buildpack-version",
-						Path:    filepath.Join("testdata", "buildpack"),
-						Latest:  true,
-						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
-					}))
-
-					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
 						ID:      "tgz-buildpack-id",
 						Version: "tgz-buildpack-version",
 						Path:    filepath.Join("testdata", "buildpack.tgz"),
@@ -282,14 +268,36 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
 					}))
 
+					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
+						ID:      "latest-buildpack-id",
+						Version: "latest-buildpack-version",
+						Path:    filepath.Join("testdata", "buildpack.tgz"),
+						Latest:  true,
+						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
+					}))
+
+					if runtime.GOOS != "windows" {
+						h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
+							ID:      "dir-buildpack-id",
+							Version: "dir-buildpack-version",
+							Path:    filepath.Join("testdata", "buildpack"),
+							Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
+						}))
+					}
+
 					h.AssertNil(t, subject.Save())
 					h.AssertEq(t, baseImage.IsSaved(), true)
 				})
 
 				it("adds the buildpack as an image layer", func() {
-					layerTar, err := baseImage.FindLayerWithPath("/buildpacks/dir-buildpack-id/dir-buildpack-version")
+					var (
+						layerTar string
+						err      error
+					)
+
+					layerTar, err = baseImage.FindLayerWithPath("/buildpacks/tgz-buildpack-id/tgz-buildpack-version")
 					h.AssertNil(t, err)
-					h.AssertOnTarEntry(t, layerTar, "/buildpacks/dir-buildpack-id/dir-buildpack-version/buildpack-file",
+					h.AssertOnTarEntry(t, layerTar, "/buildpacks/tgz-buildpack-id/tgz-buildpack-version/buildpack-file",
 						h.ContentEquals("buildpack-contents"),
 						h.HasOwnerAndGroup(1234, 4321),
 						h.HasFileMode(0654),
@@ -303,13 +311,15 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 						h.HasFileMode(0654),
 					)
 
-					layerTar, err = baseImage.FindLayerWithPath("/buildpacks/tgz-buildpack-id/tgz-buildpack-version")
-					h.AssertNil(t, err)
-					h.AssertOnTarEntry(t, layerTar, "/buildpacks/tgz-buildpack-id/tgz-buildpack-version/buildpack-file",
-						h.ContentEquals("buildpack-contents"),
-						h.HasOwnerAndGroup(1234, 4321),
-						h.HasFileMode(0654),
-					)
+					if runtime.GOOS != "windows" {
+						layerTar, err = baseImage.FindLayerWithPath("/buildpacks/dir-buildpack-id/dir-buildpack-version")
+						h.AssertNil(t, err)
+						h.AssertOnTarEntry(t, layerTar, "/buildpacks/dir-buildpack-id/dir-buildpack-version/buildpack-file",
+							h.ContentEquals("buildpack-contents"),
+							h.HasOwnerAndGroup(1234, 4321),
+							h.HasFileMode(0654),
+						)
+					}
 				})
 
 				it("adds a symlink to the buildpack layer if latest is true", func() {
@@ -330,19 +340,25 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 
 					var metadata builder.Metadata
 					h.AssertNil(t, json.Unmarshal([]byte(label), &metadata))
-					h.AssertEq(t, len(metadata.Buildpacks), 3)
+					if runtime.GOOS == "windows" {
+						h.AssertEq(t, len(metadata.Buildpacks), 2)
+					} else {
+						h.AssertEq(t, len(metadata.Buildpacks), 3)
+					}
 
-					h.AssertEq(t, metadata.Buildpacks[0].ID, "dir-buildpack-id")
-					h.AssertEq(t, metadata.Buildpacks[0].Version, "dir-buildpack-version")
+					h.AssertEq(t, metadata.Buildpacks[0].ID, "tgz-buildpack-id")
+					h.AssertEq(t, metadata.Buildpacks[0].Version, "tgz-buildpack-version")
 					h.AssertEq(t, metadata.Buildpacks[0].Latest, false)
 
 					h.AssertEq(t, metadata.Buildpacks[1].ID, "latest-buildpack-id")
 					h.AssertEq(t, metadata.Buildpacks[1].Version, "latest-buildpack-version")
 					h.AssertEq(t, metadata.Buildpacks[1].Latest, true)
 
-					h.AssertEq(t, metadata.Buildpacks[2].ID, "tgz-buildpack-id")
-					h.AssertEq(t, metadata.Buildpacks[2].Version, "tgz-buildpack-version")
-					h.AssertEq(t, metadata.Buildpacks[2].Latest, false)
+					if runtime.GOOS != "windows" {
+						h.AssertEq(t, metadata.Buildpacks[2].ID, "dir-buildpack-id")
+						h.AssertEq(t, metadata.Buildpacks[2].Version, "dir-buildpack-version")
+						h.AssertEq(t, metadata.Buildpacks[2].Latest, false)
+					}
 				})
 			})
 

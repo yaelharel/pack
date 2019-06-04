@@ -2,8 +2,9 @@ package testhelpers
 
 import (
 	"archive/tar"
-	"github.com/buildpack/pack/internal/archive"
 	"testing"
+
+	"github.com/buildpack/pack/internal/archive"
 )
 
 type TarEntryAssertion func(*testing.T, *tar.Header, []byte)
