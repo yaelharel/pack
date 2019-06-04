@@ -2,9 +2,7 @@ package testhelpers
 
 import (
 	"archive/tar"
-	"io"
-	"io/ioutil"
-	"os"
+	"github.com/buildpack/pack/internal/archive"
 	"testing"
 )
 
@@ -12,29 +10,13 @@ type TarEntryAssertion func(*testing.T, *tar.Header, []byte)
 
 func AssertOnTarEntry(t *testing.T, tarFile, entryPath string, assertFns ...TarEntryAssertion) {
 	t.Helper()
-	r, err := os.Open(tarFile)
+
+	header, bytes, err := archive.ReadTarEntry(tarFile, entryPath)
 	AssertNil(t, err)
-	defer r.Close()
 
-	tr := tar.NewReader(r)
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		AssertNil(t, err)
-
-		if header.Name == entryPath {
-			buf, err := ioutil.ReadAll(tr)
-			AssertNil(t, err)
-			for _, fn := range assertFns {
-				fn(t, header, buf)
-			}
-			return
-		}
+	for _, fn := range assertFns {
+		fn(t, header, bytes)
 	}
-
-	t.Fatalf("'%s' does not exist in '%s'", entryPath, tarFile)
 }
 
 func ContentEquals(expected string) TarEntryAssertion {

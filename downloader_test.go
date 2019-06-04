@@ -59,8 +59,8 @@ func testDownloader(t *testing.T, when spec.G, it spec.S) {
 		it("download from a relative tgz", func() {
 			out, err := subject.Download(filepath.Join("testdata", "downloader", "dirA.tgz"))
 			h.AssertNil(t, err)
-			h.AssertNotEq(t, out, "")
-			h.AssertDirContainsFileWithContents(t, out, "file.txt", "some file contents")
+			h.AssertMatch(t, out, `\.tgz$`)
+			h.AssertOnTarEntry(t, out, "./file.txt", h.ContentEquals("some file contents"))
 		})
 
 		it("download from an absolute directory", func() {
@@ -79,8 +79,8 @@ func testDownloader(t *testing.T, when spec.G, it spec.S) {
 
 			out, err := subject.Download(absPath)
 			h.AssertNil(t, err)
-			h.AssertNotEq(t, out, "")
-			h.AssertDirContainsFileWithContents(t, out, "file.txt", "some file contents")
+			h.AssertMatch(t, out, `\.tgz$`)
+			h.AssertOnTarEntry(t, out, "./file.txt", h.ContentEquals("some file contents"))
 		})
 
 		it("download from a 'file://' URI directory", func() {
@@ -99,8 +99,8 @@ func testDownloader(t *testing.T, when spec.G, it spec.S) {
 
 			out, err := subject.Download("file://" + absPath)
 			h.AssertNil(t, err)
-			h.AssertNotEq(t, out, "")
-			h.AssertDirContainsFileWithContents(t, out, "file.txt", "some file contents")
+			h.AssertMatch(t, out, `\.tgz$`)
+			h.AssertOnTarEntry(t, out, "./file.txt", h.ContentEquals("some file contents"))
 		})
 
 		it("download from a 'http(s)://' URI tgz", func() {
@@ -113,8 +113,8 @@ func testDownloader(t *testing.T, when spec.G, it spec.S) {
 
 			out, err := subject.Download(server.URL() + "/downloader/dirA.tgz")
 			h.AssertNil(t, err)
-			h.AssertNotEq(t, out, "")
-			h.AssertDirContainsFileWithContents(t, out, "file.txt", "some file contents")
+			h.AssertMatch(t, out, `\.tgz$`)
+			h.AssertOnTarEntry(t, out, "./file.txt", h.ContentEquals("some file contents"))
 		})
 	})
 }

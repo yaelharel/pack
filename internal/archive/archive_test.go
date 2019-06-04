@@ -26,7 +26,7 @@ func TestArchive(t *testing.T) {
 
 func testArchive(t *testing.T, when spec.G, it spec.S) {
 	var (
-		tmpDir, src string
+		tmpDir string
 	)
 
 	it.Before(func() {
@@ -35,7 +35,6 @@ func testArchive(t *testing.T, when spec.G, it spec.S) {
 		if err != nil {
 			t.Fatalf("failed to create tmp dir %s: %s", tmpDir, err)
 		}
-		src = filepath.Join("testdata", "dir-to-tar")
 	})
 
 	it.After(func() {
@@ -44,59 +43,71 @@ func testArchive(t *testing.T, when spec.G, it spec.S) {
 		}
 	})
 
-	when("force exec is true", func() {
-		it("writes a tar to the dest dir with 0777", func() {
-			fh, err := os.Create(filepath.Join(tmpDir, "some.tar"))
-			h.AssertNil(t, err)
+	when("#MergeTars", func() {
 
-			tw := tar.NewWriter(fh)
+	})
 
-			err = archive.WriteDirToTar(tw, src, "/nested/dir/dir-in-archive", 1234, 2345, true)
-			h.AssertNil(t, err)
-			h.AssertNil(t, tw.Close())
-			h.AssertNil(t, fh.Close())
+	when("#WriteDirToTar", func() {
+		var src string
+		it.Before(func() {
+			src = filepath.Join("testdata", "dir-to-tar")
+		})
 
-			file, err := os.Open(filepath.Join(tmpDir, "some.tar"))
-			h.AssertNil(t, err)
-			defer file.Close()
+		when("force exec is true", func() {
+			it("writes a tar to the dest dir with 0777", func() {
+				fh, err := os.Create(filepath.Join(tmpDir, "some.tar"))
+				h.AssertNil(t, err)
 
-			tr := tar.NewReader(file)
+				tw := tar.NewWriter(fh)
 
-			verify := tarVerifier{t, tr, 1234, 2345}
-			verify.nextFile("/nested/dir/dir-in-archive/some-file.txt", "some-content", int64(os.ModePerm))
-			verify.nextDirectory("/nested/dir/dir-in-archive/sub-dir", int64(os.ModePerm))
-			if runtime.GOOS != "windows" {
-				verify.nextSymLink("/nested/dir/dir-in-archive/sub-dir/link-file", "../some-file.txt")
-			}
+				err = archive.WriteDirToTar(tw, src, "/nested/dir/dir-in-archive", 1234, 2345, true)
+				h.AssertNil(t, err)
+				h.AssertNil(t, tw.Close())
+				h.AssertNil(t, fh.Close())
+
+				file, err := os.Open(filepath.Join(tmpDir, "some.tar"))
+				h.AssertNil(t, err)
+				defer file.Close()
+
+				tr := tar.NewReader(file)
+
+				verify := tarVerifier{t, tr, 1234, 2345}
+				verify.nextFile("/nested/dir/dir-in-archive/some-file.txt", "some-content", int64(os.ModePerm))
+				verify.nextDirectory("/nested/dir/dir-in-archive/sub-dir", int64(os.ModePerm))
+				if runtime.GOOS != "windows" {
+					verify.nextSymLink("/nested/dir/dir-in-archive/sub-dir/link-file", "../some-file.txt")
+				}
+			})
+		})
+
+		when("force exec is false", func() {
+			it("writes a tar to the dest dir with preexisting file mode", func() {
+				fh, err := os.Create(filepath.Join(tmpDir, "some.tar"))
+				h.AssertNil(t, err)
+
+				tw := tar.NewWriter(fh)
+
+				err = archive.WriteDirToTar(tw, src, "/nested/dir/dir-in-archive", 1234, 2345, false)
+				h.AssertNil(t, err)
+				h.AssertNil(t, tw.Close())
+				h.AssertNil(t, fh.Close())
+
+				file, err := os.Open(filepath.Join(tmpDir, "some.tar"))
+				h.AssertNil(t, err)
+				defer file.Close()
+
+				tr := tar.NewReader(file)
+
+				verify := tarVerifier{t, tr, 1234, 2345}
+				verify.nextFile("/nested/dir/dir-in-archive/some-file.txt", "some-content", fileMode(t, filepath.Join(src, "some-file.txt")))
+				verify.nextDirectory("/nested/dir/dir-in-archive/sub-dir", fileMode(t, filepath.Join(src, "sub-dir")))
+				if runtime.GOOS != "windows" {
+					verify.nextSymLink("/nested/dir/dir-in-archive/sub-dir/link-file", "../some-file.txt")
+				}
+			})
 		})
 	})
 
-	when("force exec is false", func() {
-		it("writes a tar to the dest dir with preexisting file mode", func() {
-			fh, err := os.Create(filepath.Join(tmpDir, "some.tar"))
-			h.AssertNil(t, err)
-
-			tw := tar.NewWriter(fh)
-
-			err = archive.WriteDirToTar(tw, src, "/nested/dir/dir-in-archive", 1234, 2345, false)
-			h.AssertNil(t, err)
-			h.AssertNil(t, tw.Close())
-			h.AssertNil(t, fh.Close())
-
-			file, err := os.Open(filepath.Join(tmpDir, "some.tar"))
-			h.AssertNil(t, err)
-			defer file.Close()
-
-			tr := tar.NewReader(file)
-
-			verify := tarVerifier{t, tr, 1234, 2345}
-			verify.nextFile("/nested/dir/dir-in-archive/some-file.txt", "some-content", fileMode(t, filepath.Join(src, "some-file.txt")))
-			verify.nextDirectory("/nested/dir/dir-in-archive/sub-dir", fileMode(t, filepath.Join(src, "sub-dir")))
-			if runtime.GOOS != "windows" {
-				verify.nextSymLink("/nested/dir/dir-in-archive/sub-dir/link-file", "../some-file.txt")
-			}
-		})
-	})
 }
 
 func fileMode(t *testing.T, path string) int64 {

@@ -260,17 +260,25 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 			when("buildpack has matching stack", func() {
 				it.Before(func() {
 					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
-						ID:      "some-buildpack-id",
-						Version: "some-buildpack-version",
-						Dir:     filepath.Join("testdata", "buildpack"),
+						ID:      "dir-buildpack-id",
+						Version: "dir-buildpack-version",
+						Path:    filepath.Join("testdata", "buildpack"),
 						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
 					}))
 
 					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
-						ID:      "other-buildpack-id",
-						Version: "other-buildpack-version",
-						Dir:     filepath.Join("testdata", "buildpack"),
+						ID:      "latest-buildpack-id",
+						Version: "latest-buildpack-version",
+						Path:    filepath.Join("testdata", "buildpack"),
 						Latest:  true,
+						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
+					}))
+
+					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
+						ID:      "tgz-buildpack-id",
+						Version: "tgz-buildpack-version",
+						Path:    filepath.Join("testdata", "buildpack.tgz"),
+						Latest:  false,
 						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
 					}))
 
@@ -279,50 +287,40 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 				})
 
 				it("adds the buildpack as an image layer", func() {
-					layerTar, err := baseImage.FindLayerWithPath("/buildpacks/some-buildpack-id/some-buildpack-version")
+					layerTar, err := baseImage.FindLayerWithPath("/buildpacks/dir-buildpack-id/dir-buildpack-version")
 					h.AssertNil(t, err)
-					h.AssertOnTarEntry(t, layerTar, "/buildpacks/some-buildpack-id/some-buildpack-version/buildpack-file", h.ContentEquals("buildpack-contents"))
+					h.AssertOnTarEntry(t, layerTar, "/buildpacks/dir-buildpack-id/dir-buildpack-version/buildpack-file",
+						h.ContentEquals("buildpack-contents"),
+						h.HasOwnerAndGroup(1234, 4321),
+						h.HasFileMode(0654),
+					)
 
-					layerTar, err = baseImage.FindLayerWithPath("/buildpacks/other-buildpack-id/other-buildpack-version")
+					layerTar, err = baseImage.FindLayerWithPath("/buildpacks/latest-buildpack-id/latest-buildpack-version")
 					h.AssertNil(t, err)
-					h.AssertOnTarEntry(t, layerTar, "/buildpacks/other-buildpack-id/other-buildpack-version/buildpack-file", h.ContentEquals("buildpack-contents"))
+					h.AssertOnTarEntry(t, layerTar, "/buildpacks/latest-buildpack-id/latest-buildpack-version/buildpack-file",
+						h.ContentEquals("buildpack-contents"),
+						h.HasOwnerAndGroup(1234, 4321),
+						h.HasFileMode(0654),
+					)
+
+					layerTar, err = baseImage.FindLayerWithPath("/buildpacks/tgz-buildpack-id/tgz-buildpack-version")
+					h.AssertNil(t, err)
+					h.AssertOnTarEntry(t, layerTar, "/buildpacks/tgz-buildpack-id/tgz-buildpack-version/buildpack-file",
+						h.ContentEquals("buildpack-contents"),
+						h.HasOwnerAndGroup(1234, 4321),
+						h.HasFileMode(0654),
+					)
 				})
 
 				it("adds a symlink to the buildpack layer if latest is true", func() {
-					layerTar, err := baseImage.FindLayerWithPath("/buildpacks/other-buildpack-id")
+					layerTar, err := baseImage.FindLayerWithPath("/buildpacks/latest-buildpack-id")
 					h.AssertNil(t, err)
 					h.AssertOnTarEntry(t,
 						layerTar,
-						"/buildpacks/other-buildpack-id/latest",
-						h.SymlinksTo("/buildpacks/other-buildpack-id/other-buildpack-version"),
-					)
-					h.AssertOnTarEntry(t,
-						layerTar,
-						"/buildpacks/other-buildpack-id/latest",
+						"/buildpacks/latest-buildpack-id/latest",
+						h.SymlinksTo("/buildpacks/latest-buildpack-id/latest-buildpack-version"),
 						h.HasOwnerAndGroup(0, 0),
-					)
-					h.AssertOnTarEntry(t,
-						layerTar,
-						"/buildpacks/other-buildpack-id/latest",
 						h.HasFileMode(0644),
-					)
-				})
-
-				it("adds the buildpack contents with the correct uid and gid", func() {
-					layerTar, err := baseImage.FindLayerWithPath("/buildpacks/some-buildpack-id/some-buildpack-version")
-					h.AssertNil(t, err)
-					h.AssertOnTarEntry(t,
-						layerTar,
-						"/buildpacks/some-buildpack-id/some-buildpack-version/buildpack-file",
-						h.HasOwnerAndGroup(1234, 4321),
-					)
-
-					layerTar, err = baseImage.FindLayerWithPath("/buildpacks/other-buildpack-id/other-buildpack-version")
-					h.AssertNil(t, err)
-					h.AssertOnTarEntry(t,
-						layerTar,
-						"/buildpacks/other-buildpack-id/other-buildpack-version/buildpack-file",
-						h.HasOwnerAndGroup(1234, 4321),
 					)
 				})
 
@@ -332,15 +330,19 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 
 					var metadata builder.Metadata
 					h.AssertNil(t, json.Unmarshal([]byte(label), &metadata))
-					h.AssertEq(t, len(metadata.Buildpacks), 2)
+					h.AssertEq(t, len(metadata.Buildpacks), 3)
 
-					h.AssertEq(t, metadata.Buildpacks[0].ID, "some-buildpack-id")
-					h.AssertEq(t, metadata.Buildpacks[0].Version, "some-buildpack-version")
+					h.AssertEq(t, metadata.Buildpacks[0].ID, "dir-buildpack-id")
+					h.AssertEq(t, metadata.Buildpacks[0].Version, "dir-buildpack-version")
 					h.AssertEq(t, metadata.Buildpacks[0].Latest, false)
 
-					h.AssertEq(t, metadata.Buildpacks[1].ID, "other-buildpack-id")
-					h.AssertEq(t, metadata.Buildpacks[1].Version, "other-buildpack-version")
+					h.AssertEq(t, metadata.Buildpacks[1].ID, "latest-buildpack-id")
+					h.AssertEq(t, metadata.Buildpacks[1].Version, "latest-buildpack-version")
 					h.AssertEq(t, metadata.Buildpacks[1].Latest, true)
+
+					h.AssertEq(t, metadata.Buildpacks[2].ID, "tgz-buildpack-id")
+					h.AssertEq(t, metadata.Buildpacks[2].Version, "tgz-buildpack-version")
+					h.AssertEq(t, metadata.Buildpacks[2].Latest, false)
 				})
 			})
 
@@ -349,7 +351,7 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 					err := subject.AddBuildpack(buildpack.Buildpack{
 						ID:      "some-buildpack-id",
 						Version: "some-buildpack-version",
-						Dir:     filepath.Join("testdata", "buildpack"),
+						Path:    filepath.Join("testdata", "buildpack"),
 						Stacks:  []buildpack.Stack{{ID: "other.stack.id"}},
 					})
 					h.AssertError(t, err, "buildpack 'some-buildpack-id' version 'some-buildpack-version' does not support stack 'some.stack.id'")
@@ -370,7 +372,7 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
 						ID:      "some-buildpack-id",
 						Version: "some-buildpack-version",
-						Dir:     filepath.Join("testdata", "buildpack"),
+						Path:    filepath.Join("testdata", "buildpack"),
 						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
 					}))
 					h.AssertNil(t, subject.Save())
@@ -406,20 +408,20 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
 						ID:      "some-buildpack-id",
 						Version: "some-buildpack-version",
-						Dir:     filepath.Join("testdata", "buildpack"),
+						Path:    filepath.Join("testdata", "buildpack"),
 						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
 					}))
 					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
 						ID:      "optional-buildpack-id",
 						Version: "older-optional-buildpack-version",
-						Dir:     filepath.Join("testdata", "buildpack"),
+						Path:    filepath.Join("testdata", "buildpack"),
 						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
 					}))
 					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
 						ID:      "optional-buildpack-id",
 						Version: "optional-buildpack-version",
 						Latest:  true,
-						Dir:     filepath.Join("testdata", "buildpack"),
+						Path:    filepath.Join("testdata", "buildpack"),
 						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
 					}))
 					h.AssertNil(t, subject.SetOrder([]builder.GroupMetadata{
@@ -507,7 +509,7 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 					h.AssertNil(t, subject.AddBuildpack(buildpack.Buildpack{
 						ID:      "some-buildpack-id",
 						Version: "some-buildpack-version",
-						Dir:     filepath.Join("testdata", "buildpack"),
+						Path:    filepath.Join("testdata", "buildpack"),
 						Stacks:  []buildpack.Stack{{ID: "some.stack.id"}},
 					}))
 					err := subject.SetOrder([]builder.GroupMetadata{

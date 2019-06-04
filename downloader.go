@@ -12,7 +12,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/buildpack/pack/internal/archive"
 	"github.com/buildpack/pack/logging"
 )
 
@@ -36,37 +35,12 @@ func (d *Downloader) Download(uri string) (string, error) {
 
 	switch url.Scheme {
 	case "", "file":
-		return d.handleFile(url)
+		return url.Path, nil
 	case "http", "https":
 		return d.handleHTTP(uri)
 	default:
 		return "", fmt.Errorf("unsupported protocol in URI %q", uri)
 	}
-}
-
-func (d *Downloader) handleFile(bpURL *url.URL) (string, error) {
-	path := bpURL.Path
-
-	if filepath.Ext(path) != ".tgz" {
-		return path, nil
-	}
-
-	file, err := os.Open(path)
-	if err != nil {
-		return "", errors.Wrapf(err, "could not open file to untar: %q", path)
-	}
-	defer file.Close()
-
-	tmpDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		return "", fmt.Errorf(`failed to create temporary directory: %s`, err)
-	}
-
-	if err = archive.ExtractTarGZ(file, tmpDir); err != nil {
-		return "", err
-	}
-
-	return tmpDir, nil
 }
 
 func (d *Downloader) handleHTTP(uri string) (string, error) {
@@ -98,7 +72,14 @@ func (d *Downloader) handleHTTP(uri string) (string, error) {
 	}
 	defer reader.Close()
 
-	if err = archive.ExtractTarGZ(reader, bpCache); err != nil {
+	tgzFile := bpCache + ".tgz"
+	fh, err := os.Create(tgzFile)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = io.Copy(fh, reader)
+	if err != nil {
 		return "", err
 	}
 
@@ -106,7 +87,7 @@ func (d *Downloader) handleHTTP(uri string) (string, error) {
 		return "", err
 	}
 
-	return bpCache, nil
+	return tgzFile, nil
 }
 
 func (d *Downloader) downloadAsStream(uri string, etag string) (io.ReadCloser, string, error) {
