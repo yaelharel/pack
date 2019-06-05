@@ -42,12 +42,12 @@ func testFetcher(t *testing.T, when spec.G, it spec.S) {
 			it("returns a release from github", func() {
 				mockDownloader.EXPECT().
 					Download("https://github.com/buildpack/lifecycle/releases/download/v1.2.3/lifecycle-v1.2.3+linux.x86-64.tgz").
-					Return(filepath.Join("testdata", "download-dir"), nil)
+					Return(filepath.Join("testdata", "lifecycle.tgz"), nil)
 
 				md, err := subject.Fetch(semver.MustParse("1.2.3"), "")
 				h.AssertNil(t, err)
 				h.AssertEq(t, md.Version.String(), "1.2.3")
-				h.AssertEq(t, md.Dir, filepath.Join("testdata", "download-dir", "fake-lifecycle"))
+				h.AssertEq(t, md.Path, filepath.Join("testdata", "lifecycle.tgz"))
 			})
 		})
 
@@ -55,12 +55,12 @@ func testFetcher(t *testing.T, when spec.G, it spec.S) {
 			it("returns the lifecycle from the uri", func() {
 				mockDownloader.EXPECT().
 					Download("https://lifecycle.example.com").
-					Return(filepath.Join("testdata", "download-dir"), nil)
+					Return(filepath.Join("testdata", "lifecycle.tgz"), nil)
 
 				md, err := subject.Fetch(nil, "https://lifecycle.example.com")
 				h.AssertNil(t, err)
 				h.AssertNil(t, md.Version)
-				h.AssertEq(t, md.Dir, filepath.Join("testdata", "download-dir", "fake-lifecycle"))
+				h.AssertEq(t, md.Path, filepath.Join("testdata", "lifecycle.tgz"))
 			})
 		})
 
@@ -68,12 +68,12 @@ func testFetcher(t *testing.T, when spec.G, it spec.S) {
 			it("returns the lifecycle from the uri", func() {
 				mockDownloader.EXPECT().
 					Download("https://lifecycle.example.com").
-					Return(filepath.Join("testdata", "download-dir"), nil)
+					Return(filepath.Join("testdata", "lifecycle.tgz"), nil)
 
 				md, err := subject.Fetch(semver.MustParse("1.2.3"), "https://lifecycle.example.com")
 				h.AssertNil(t, err)
 				h.AssertEq(t, md.Version.String(), "1.2.3")
-				h.AssertEq(t, md.Dir, filepath.Join("testdata", "download-dir", "fake-lifecycle"))
+				h.AssertEq(t, md.Path, filepath.Join("testdata", "lifecycle.tgz"))
 			})
 		})
 
@@ -81,12 +81,12 @@ func testFetcher(t *testing.T, when spec.G, it spec.S) {
 			it("returns the default lifecycle", func() {
 				mockDownloader.EXPECT().
 					Download("https://github.com/buildpack/lifecycle/releases/download/v0.2.0/lifecycle-v0.2.0+linux.x86-64.tgz").
-					Return(filepath.Join("testdata", "download-dir"), nil)
+					Return(filepath.Join("testdata", "lifecycle.tgz"), nil)
 
 				md, err := subject.Fetch(nil, "")
 				h.AssertNil(t, err)
 				h.AssertEq(t, md.Version.String(), "0.2.0")
-				h.AssertEq(t, md.Dir, filepath.Join("testdata", "download-dir", "fake-lifecycle"))
+				h.AssertEq(t, md.Path, filepath.Join("testdata", "lifecycle.tgz"))
 			})
 		})
 

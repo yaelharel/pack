@@ -85,7 +85,7 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 
 			mockLifecycleFetcher.EXPECT().Fetch(gomock.Any(), gomock.Any()).
 				Return(lifecycle.Metadata{
-					Dir:     filepath.Join("testdata", "lifecycle"),
+					Path:    filepath.Join("testdata", "lifecycle.tgz"),
 					Version: semver.MustParse("3.4.5"),
 				}, nil).AnyTimes()
 

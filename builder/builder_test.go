@@ -196,7 +196,7 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 			it.Before(func() {
 				h.AssertNil(t, subject.SetLifecycle(lifecycle.Metadata{
 					Version: semver.MustParse("1.2.3"),
-					Dir:     filepath.Join("testdata", "lifecycle"),
+					Path:    filepath.Join("testdata", "lifecycle.tgz"),
 				}))
 				h.AssertNil(t, subject.Save())
 				h.AssertEq(t, baseImage.IsSaved(), true)
