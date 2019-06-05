@@ -116,5 +116,28 @@ func testDownloader(t *testing.T, when spec.G, it spec.S) {
 			h.AssertMatch(t, out, `\.tgz$`)
 			h.AssertOnTarEntry(t, out, "./file.txt", h.ContentEquals("some file contents"))
 		})
+
+		it.Focus("use cache from a 'http(s)://' URI tgz", func() {
+			server := ghttp.NewServer()
+			server.AppendHandlers(func(w http.ResponseWriter, r *http.Request) {
+				path := filepath.Join("testdata", r.URL.Path)
+				w.Header().Add("ETag", "A")
+				http.ServeFile(w, r, path)
+			})
+			server.AppendHandlers(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(304)
+			})
+			defer server.Close()
+
+			out, err := subject.Download(server.URL() + "/downloader/dirA.tgz")
+			h.AssertNil(t, err)
+			h.AssertMatch(t, out, `\.tgz$`)
+			h.AssertOnTarEntry(t, out, "./file.txt", h.ContentEquals("some file contents"))
+
+			out, err = subject.Download(server.URL() + "/downloader/dirA.tgz")
+			h.AssertNil(t, err)
+			h.AssertMatch(t, out, `\.tgz$`)
+			h.AssertOnTarEntry(t, out, "./file.txt", h.ContentEquals("some file contents"))
+		})
 	})
 }
