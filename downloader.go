@@ -44,12 +44,14 @@ func (d *Downloader) Download(uri string) (string, error) {
 }
 
 func (d *Downloader) handleHTTP(uri string) (string, error) {
-	bpCache := filepath.Join(d.cacheDir, fmt.Sprintf("%x", sha256.Sum256([]byte(uri))))
-	if err := os.MkdirAll(bpCache, 0744); err != nil {
+	if err := os.MkdirAll(d.cacheDir, 0744); err != nil {
 		return "", err
 	}
 
-	etagFile := bpCache + ".etag"
+	cachePath := filepath.Join(d.cacheDir, fmt.Sprintf("%x", sha256.Sum256([]byte(uri))))
+	tgzFile := cachePath + ".tgz"
+
+	etagFile := cachePath + ".etag"
 	etagExists, err := fileExists(etagFile)
 	if err != nil {
 		return "", err
@@ -68,11 +70,10 @@ func (d *Downloader) handleHTTP(uri string) (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to download from %q", uri)
 	} else if reader == nil {
-		return bpCache, nil
+		return tgzFile, nil
 	}
 	defer reader.Close()
 
-	tgzFile := bpCache + ".tgz"
 	fh, err := os.Create(tgzFile)
 	if err != nil {
 		return "", err
