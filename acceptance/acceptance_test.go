@@ -724,7 +724,6 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 }
 
 func createBuilder(t *testing.T, runImageMirror string) string {
-	skipOnWindows(t, "create builder is not implemented on windows")
 	t.Log("create builder image")
 
 	tmpDir, err := ioutil.TempDir("", "create-test-builder")
