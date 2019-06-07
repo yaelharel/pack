@@ -297,6 +297,11 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 
 					layerTar, err = baseImage.FindLayerWithPath("/buildpacks/tgz-buildpack-id/tgz-buildpack-version")
 					h.AssertNil(t, err)
+
+					h.AssertOnTarEntry(t, layerTar, "/buildpacks/tgz-buildpack-id/tgz-buildpack-version",
+						h.IsDirectory(),
+					)
+
 					h.AssertOnTarEntry(t, layerTar, "/buildpacks/tgz-buildpack-id/tgz-buildpack-version/buildpack-file",
 						h.ContentEquals("buildpack-contents"),
 						h.HasOwnerAndGroup(1234, 4321),

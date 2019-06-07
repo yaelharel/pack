@@ -117,7 +117,7 @@ func testDownloader(t *testing.T, when spec.G, it spec.S) {
 			h.AssertOnTarEntry(t, out, "./file.txt", h.ContentEquals("some file contents"))
 		})
 
-		it.Focus("use cache from a 'http(s)://' URI tgz", func() {
+		it("use cache from a 'http(s)://' URI tgz", func() {
 			server := ghttp.NewServer()
 			server.AppendHandlers(func(w http.ResponseWriter, r *http.Request) {
 				path := filepath.Join("testdata", r.URL.Path)

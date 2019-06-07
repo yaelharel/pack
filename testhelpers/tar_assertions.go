@@ -58,3 +58,12 @@ func HasFileMode(expectedMode int64) TarEntryAssertion {
 		}
 	}
 }
+
+func IsDirectory() TarEntryAssertion {
+	return func(t *testing.T, header *tar.Header, _ []byte) {
+		t.Helper()
+		if header.Typeflag != tar.TypeDir {
+			t.Fatalf("expected '%s' to be a directory but was '%d'", header.Name, header.Typeflag)
+		}
+	}
+}

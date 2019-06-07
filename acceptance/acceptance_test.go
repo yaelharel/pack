@@ -149,7 +149,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 				t.Log("no previous image exists")
 				cmd := packCmd(
 					"build", repoName,
-					"-p", "testdata/mock_app/.",
+					"-p", filepath.Join("testdata", "mock_app"),
 				)
 				output := h.Run(t, cmd)
 				h.AssertContains(t, output, fmt.Sprintf("Successfully built image '%s'", repoName))
@@ -183,7 +183,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 				}
 
 				t.Log("rebuild")
-				cmd = packCmd("build", repoName, "-p", "testdata/mock_app/.")
+				cmd = packCmd("build", repoName, "-p", filepath.Join("testdata", "mock_app"))
 				output = h.Run(t, cmd)
 				h.AssertContains(t, output, fmt.Sprintf("Successfully built image '%s'", repoName))
 				sha, err = imgSHAFromOutput(output, repoName)
@@ -220,13 +220,12 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			when("--buildpack", func() {
-				when("the argument is a directory or id", func() {
+				when("the argument is a tgz or id", func() {
 					it("adds the buildpacks to the builder if necessary and runs them", func() {
-						skipOnWindows(t, "buildpack directories not supported on windows")
 						cmd := packCmd(
 							"build", repoName,
 							"-p", filepath.Join("testdata", "mock_app"),
-							"--buildpack", filepath.Join("testdata", "mock_buildpacks", "not-in-builder-buildpack"),
+							"--buildpack", filepath.Join("testdata", "mock_buildpacks", "not-in-builder-buildpack.tgz"),
 							"--buildpack", "simple/layers@simple-layers-version",
 							"--buildpack", "noop.buildpack",
 						)
@@ -241,18 +240,34 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 						)
 					})
 
-					when("the buildpack stack doesn't match the builder", func() {
-						it("errors", func() {
-							skipOnWindows(t, "buildpack directories not supported on windows")
-							cmd := packCmd(
-								"build", repoName,
-								"-p", filepath.Join("testdata", "mock_app"),
-								"--buildpack", filepath.Join("testdata", "mock_buildpacks", "other-stack"),
-							)
-							txt, err := h.RunE(cmd)
-							h.AssertNotNil(t, err)
-							h.AssertContains(t, txt, "buildpack 'other/stack/bp' version 'other-stack-version' does not support stack 'pack.test.stack'")
-						})
+				})
+
+				when("the argument is directory or id", func() {
+					it("adds the buildpacks to the builder if necessary and runs them", func() {
+						skipOnWindows(t, "buildpack directories not supported on windows")
+						cmd := packCmd(
+							"build", repoName,
+							"-p", filepath.Join("testdata", "mock_app"),
+							"--buildpack", filepath.Join("testdata", "mock_buildpacks", "not-in-builder-buildpack"),
+						)
+						output := h.Run(t, cmd)
+						h.AssertContains(t, output, fmt.Sprintf("Successfully built image '%s'", repoName))
+						t.Log("app is runnable")
+						assertMockAppRunsWithOutput(t, repoName, "Local Buildpack Dep Contents")
+					})
+				})
+
+				when("the buildpack stack doesn't match the builder", func() {
+					it("errors", func() {
+						skipOnWindows(t, "buildpack directories not supported on windows")
+						cmd := packCmd(
+							"build", repoName,
+							"-p", filepath.Join("testdata", "mock_app"),
+							"--buildpack", filepath.Join("testdata", "mock_buildpacks", "other-stack-buildpack"),
+						)
+						txt, err := h.RunE(cmd)
+						h.AssertNotNil(t, err)
+						h.AssertContains(t, txt, "buildpack 'other/stack/bp' version 'other-stack-version' does not support stack 'pack.test.stack'")
 					})
 				})
 			})
@@ -457,17 +472,17 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 			it.After(func() {
 				absPath, err := filepath.Abs(filepath.Join("testdata", "mock_app"))
 				h.AssertNil(t, err)
+
 				sum := sha256.Sum256([]byte(absPath))
 				repoName := fmt.Sprintf("pack.local/run/%x", sum[:8])
 				ref, err := name.ParseReference(repoName, name.WeakValidation)
 				h.AssertNil(t, err)
+
 				h.DockerRmi(dockerCli, repoName)
-				cacheImage := cache.NewImageCache(ref, dockerCli)
-				buildCacheVolume := cache.NewVolumeCache(ref, "build", dockerCli)
-				launchCacheVolume := cache.NewVolumeCache(ref, "launch", dockerCli)
-				cacheImage.Clear(context.TODO())
-				buildCacheVolume.Clear(context.TODO())
-				launchCacheVolume.Clear(context.TODO())
+
+				cache.NewImageCache(ref, dockerCli).Clear(context.TODO())
+				cache.NewVolumeCache(ref, "build", dockerCli).Clear(context.TODO())
+				cache.NewVolumeCache(ref, "launch", dockerCli).Clear(context.TODO())
 			})
 
 			it("starts an image", func() {
@@ -746,7 +761,7 @@ func createBuilder(t *testing.T, runImageMirror string) string {
 			t.Fatal("LIFECYCLE_PATH must be an absolute path")
 		}
 		t.Logf("Adding lifecycle path '%s' to builder config", lifecyclePath)
-		_, err = builderConfigFile.Write([]byte(fmt.Sprintf("uri = \"%s\"\n", lifecyclePath)))
+		_, err = builderConfigFile.Write([]byte(fmt.Sprintf("uri = \"%s\"\n", strings.ReplaceAll(lifecyclePath, `\`, `\\`))))
 		h.AssertNil(t, err)
 	}
 	if lcver, ok := os.LookupEnv("LIFECYCLE_VERSION"); ok {

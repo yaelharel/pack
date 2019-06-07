@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -28,14 +29,14 @@ func NewDownloader(logger logging.Logger, cacheDir string) *Downloader {
 }
 
 func (d *Downloader) Download(uri string) (string, error) {
-	url, err := url.Parse(uri)
+	parsedUrl, err := url.Parse(uri)
 	if err != nil {
 		return "", err
 	}
 
-	switch url.Scheme {
+	switch parsedUrl.Scheme {
 	case "", "file":
-		return url.Path, nil
+		return strings.TrimPrefix(uri, "file://"), nil
 	case "http", "https":
 		return d.handleHTTP(uri)
 	default:

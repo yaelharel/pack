@@ -3,7 +3,7 @@ package builder
 import (
 	"archive/tar"
 	"bytes"
-	gzip "compress/gzip"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -386,7 +387,7 @@ func (b *Builder) orderLayer(dest string) (string, error) {
 	}
 
 	layerTar := filepath.Join(dest, "order.tar")
-	err = archive.CreateSingleFileTar(layerTar, buildpacksDir+"/order.toml", orderTOML.String())
+	err = archive.CreateSingleFileTar(layerTar, unixJoin(buildpacksDir, "order.toml"), orderTOML.String())
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to create order.toml layer tar")
 	}
@@ -402,7 +403,7 @@ func (b *Builder) stackLayer(dest string) (string, error) {
 	}
 
 	layerTar := filepath.Join(dest, "stack.tar")
-	err = archive.CreateSingleFileTar(layerTar, buildpacksDir+"/stack.toml", stackTOML.String())
+	err = archive.CreateSingleFileTar(layerTar, unixJoin(buildpacksDir, "stack.toml"), stackTOML.String())
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to create stack.toml layer tar")
 	}
@@ -431,14 +432,14 @@ func (b *Builder) buildpackLayer(dest string, bp buildpack.Buildpack) (string, e
 
 	if err := tw.WriteHeader(&tar.Header{
 		Typeflag: tar.TypeDir,
-		Name:     buildpacksDir + "/" + bp.EscapedID(),
+		Name:     unixJoin(buildpacksDir, bp.EscapedID()),
 		Mode:     0755,
 		ModTime:  now,
 	}); err != nil {
 		return "", err
 	}
 
-	baseTarDir := fmt.Sprintf("%s/%s/%s", buildpacksDir, bp.EscapedID(), bp.Version)
+	baseTarDir := unixJoin(buildpacksDir, bp.EscapedID(), bp.Version)
 	if err := tw.WriteHeader(&tar.Header{
 		Typeflag: tar.TypeDir,
 		Name:     baseTarDir,
@@ -513,7 +514,12 @@ func (b *Builder) embedBuildpackTar(tw *tar.Writer, srcTar, baseTarDir string) e
 			return errors.Wrap(err, "failed to get next tar entry")
 		}
 
-		header.Name = baseTarDir + "/" + strings.TrimPrefix(header.Name, "./")
+		header.Name = unixClean(header.Name)
+		if header.Name == "." || header.Name == "/" {
+			continue
+		}
+
+		header.Name = unixClean(unixJoin(baseTarDir, header.Name))
 		header.Uid = b.UID
 		header.Gid = b.GID
 		err = tw.WriteHeader(header)
@@ -608,7 +614,7 @@ func (b *Builder) envLayer(dest string, env map[string]string) (string, error) {
 
 	for k, v := range env {
 		if err := tw.WriteHeader(&tar.Header{
-			Name:    platformDir + "/env/" + k,
+			Name:    unixJoin(platformDir, "env", k),
 			Size:    int64(len(v)),
 			Mode:    0644,
 			ModTime: now,
@@ -650,4 +656,18 @@ func (b *Builder) lifecycleLayer(dest string) (string, error) {
 	}
 
 	return fh.Name(), nil
+}
+
+func unixJoin(paths ...string) string {
+	return strings.Join(paths, "/")
+}
+
+func unixClean(path string) string {
+	cleaned := filepath.Clean(path)
+
+	if runtime.GOOS == "windows" {
+		return strings.ReplaceAll(cleaned, `\`, "/")
+	}
+
+	return cleaned
 }
