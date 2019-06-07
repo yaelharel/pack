@@ -259,11 +259,10 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 
 				when("the buildpack stack doesn't match the builder", func() {
 					it("errors", func() {
-						skipOnWindows(t, "buildpack directories not supported on windows")
 						cmd := packCmd(
 							"build", repoName,
 							"-p", filepath.Join("testdata", "mock_app"),
-							"--buildpack", filepath.Join("testdata", "mock_buildpacks", "other-stack-buildpack"),
+							"--buildpack", filepath.Join("testdata", "mock_buildpacks", "other-stack-buildpack.tgz"),
 						)
 						txt, err := h.RunE(cmd)
 						h.AssertNotNil(t, err)
@@ -276,10 +275,10 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 				var envPath string
 
 				it.Before(func() {
-					skipOnWindows(t, "directory buildpacks are not implemented on windows")
-
 					envfile, err := ioutil.TempFile("", "envfile")
 					h.AssertNil(t, err)
+					defer envfile.Close()
+
 					err = os.Setenv("ENV2_CONTENTS", "Env2 Layer Contents From Environment")
 					h.AssertNil(t, err)
 					envfile.WriteString(`
@@ -309,7 +308,6 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 
 			when("--env", func() {
 				it.Before(func() {
-					skipOnWindows(t, "directory buildpacks are not implemented on windows")
 					h.AssertNil(t,
 						os.Setenv("ENV2_CONTENTS", "Env2 Layer Contents From Environment"),
 					)
@@ -464,11 +462,18 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	when("pack run", func() {
-		it.Before(func() {
-			skipOnWindows(t, "cleaning up from this test is leaving containers on windows")
-		})
-
+		// TODO: This test is known to NOT clean up properly on windows.
 		when("there is a builder", func() {
+			var (
+				listeningPort string
+				err           error
+			)
+
+			it.Before(func() {
+				listeningPort, err = h.GetFreePort()
+				h.AssertNil(t, err)
+			})
+
 			it.After(func() {
 				absPath, err := filepath.Abs(filepath.Join("testdata", "mock_app"))
 				h.AssertNil(t, err)
@@ -488,7 +493,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 			it("starts an image", func() {
 				var buf bytes.Buffer
 				cmd := packCmd("run",
-					"--port", "3000:8080",
+					"--port", listeningPort+":8080",
 					"-p", filepath.Join("testdata", "mock_app"),
 					"--builder", builder,
 				)
@@ -499,7 +504,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 				defer ctrlCProc(cmd)
 
 				h.AssertEq(t, isCommandRunning(cmd), true)
-				assertMockAppResponseContains(t, "3000", 30*time.Second, "Launch Dep Contents", "Cached Dep Contents")
+				assertMockAppResponseContains(t, listeningPort, 30*time.Second, "Launch Dep Contents", "Cached Dep Contents")
 			})
 		})
 
@@ -663,12 +668,14 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 
 			it.After(func() {
 				h.DockerRmi(dockerCli, origID, builderName, origRunImageID, runImage)
+
 				ref, err := name.ParseReference(repoName, name.WeakValidation)
 				h.AssertNil(t, err)
 				h.AssertNil(t, h.DockerRmi(dockerCli, repoName))
 				cacheImage := cache.NewImageCache(ref, dockerCli)
 				buildCacheVolume := cache.NewVolumeCache(ref, "build", dockerCli)
 				launchCacheVolume := cache.NewVolumeCache(ref, "launch", dockerCli)
+
 				cacheImage.Clear(context.TODO())
 				buildCacheVolume.Clear(context.TODO())
 				launchCacheVolume.Clear(context.TODO())
@@ -925,9 +932,6 @@ func isCommandRunning(cmd *exec.Cmd) bool {
 	_, err := os.FindProcess(cmd.Process.Pid)
 	if err != nil {
 		return false
-	}
-	if runtime.GOOS == "windows" {
-		return true
 	}
 	return true
 }
