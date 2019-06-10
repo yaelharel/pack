@@ -22,7 +22,7 @@ func testPaths(t *testing.T, when spec.G, it spec.S) {
 		when("is windows", func() {
 			when("path is absolute", func() {
 				it("returns uri", func() {
-					skipIf(t, runtime.GOOS != "windows", "Skipped on non-windows")
+					h.SkipIf(t, runtime.GOOS != "windows", "Skipped on non-windows")
 
 					uri, err := FilePathToUri(`C:\some\file.txt`)
 					h.AssertNil(t, err)
@@ -32,7 +32,7 @@ func testPaths(t *testing.T, when spec.G, it spec.S) {
 
 			when("path is relative", func() {
 				it("returns uri", func() {
-					skipIf(t, runtime.GOOS != "windows", "Skipped on non-windows")
+					h.SkipIf(t, runtime.GOOS != "windows", "Skipped on non-windows")
 
 					uri, err := FilePathToUri(`some\file.tgz`)
 					h.AssertNil(t, err)
@@ -48,7 +48,7 @@ func testPaths(t *testing.T, when spec.G, it spec.S) {
 		when("is *nix", func() {
 			when("path is absolute", func() {
 				it("returns uri", func() {
-					skipIf(t, runtime.GOOS == "windows", "Skipped on windows")
+					h.SkipIf(t, runtime.GOOS == "windows", "Skipped on windows")
 
 					uri, err := FilePathToUri("/tmp/file.tgz")
 					h.AssertNil(t, err)
@@ -58,7 +58,7 @@ func testPaths(t *testing.T, when spec.G, it spec.S) {
 
 			when("path is relative", func() {
 				it("returns uri", func() {
-					skipIf(t, runtime.GOOS == "windows", "Skipped on windows")
+					h.SkipIf(t, runtime.GOOS == "windows", "Skipped on windows")
 
 					uri, err := FilePathToUri("some/file.tgz")
 					h.AssertNil(t, err)
@@ -76,7 +76,7 @@ func testPaths(t *testing.T, when spec.G, it spec.S) {
 		when("is windows", func() {
 			when("uri is drive", func() {
 				it("returns path", func() {
-					skipIf(t, runtime.GOOS != "windows", "Skipped on non-windows")
+					h.SkipIf(t, runtime.GOOS != "windows", "Skipped on non-windows")
 
 					path, err := UriToFilePath(`file:///c:/laptop/file.tgz`)
 					h.AssertNil(t, err)
@@ -87,7 +87,7 @@ func testPaths(t *testing.T, when spec.G, it spec.S) {
 
 			when("uri is network share", func() {
 				it("returns path", func() {
-					skipIf(t, runtime.GOOS != "windows", "Skipped on non-windows")
+					h.SkipIf(t, runtime.GOOS != "windows", "Skipped on non-windows")
 
 					path, err := UriToFilePath(`file://laptop/file.tgz`)
 					h.AssertNil(t, err)
@@ -100,7 +100,7 @@ func testPaths(t *testing.T, when spec.G, it spec.S) {
 		when("is *nix", func() {
 			when("uri is valid", func() {
 				it("returns path", func() {
-					skipIf(t, runtime.GOOS == "windows", "Skipped on windows")
+					h.SkipIf(t, runtime.GOOS == "windows", "Skipped on windows")
 
 					path, err := UriToFilePath(`file:///tmp/file.tgz`)
 					h.AssertNil(t, err)
@@ -110,12 +110,6 @@ func testPaths(t *testing.T, when spec.G, it spec.S) {
 			})
 		})
 	})
-}
-
-func skipIf(t *testing.T, expression bool, reason string) {
-	if expression {
-		t.Skip(reason)
-	}
 }
 
 func replaceCwdUriPathWith(uri, replacement string) (string, error) {

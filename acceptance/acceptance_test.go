@@ -244,7 +244,8 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S) {
 
 				when("the argument is directory or id", func() {
 					it("adds the buildpacks to the builder if necessary and runs them", func() {
-						skipOnWindows(t, "buildpack directories not supported on windows")
+						h.SkipIf(t, runtime.GOOS == "windows", "buildpack directories not supported on windows")
+
 						cmd := packCmd(
 							"build", repoName,
 							"-p", filepath.Join("testdata", "mock_app"),
@@ -920,12 +921,6 @@ func ctrlCProc(cmd *exec.Cmd) error {
 	}
 	_, err := cmd.Process.Wait()
 	return err
-}
-
-func skipOnWindows(t *testing.T, message string) {
-	if runtime.GOOS == "windows" {
-		t.Skip(message)
-	}
 }
 
 func isCommandRunning(cmd *exec.Cmd) bool {
