@@ -81,7 +81,7 @@ func CreateSingleFileTar(tarFile, path, txt string) error {
 	return tw.Close()
 }
 
-func ReadTarEntry(tarPath string, entryPath string) (*tar.Header, []byte, error) {
+func ReadTarEntry(tarPath string, entryPath... string) (*tar.Header, []byte, error) {
 	var (
 		tarFile    *os.File
 		gzipReader *gzip.Reader
@@ -116,7 +116,7 @@ func ReadTarEntry(tarPath string, entryPath string) (*tar.Header, []byte, error)
 			return nil, nil, errors.Wrap(err, "failed to get next tar entry")
 		}
 
-		if header.Name == entryPath {
+		if contains(entryPath, header.Name) {
 			buf, err := ioutil.ReadAll(tr)
 			if err != nil {
 				return nil, nil, errors.Wrapf(err, "failed to read contents of '%s'", entryPath)
@@ -127,6 +127,15 @@ func ReadTarEntry(tarPath string, entryPath string) (*tar.Header, []byte, error)
 	}
 
 	return nil, nil, fmt.Errorf("could not find entry path '%s' in tar", entryPath)
+}
+
+func contains(slice []string, element string) bool {
+	for _, a := range slice {
+		if a == element {
+			return true
+		}
+	}
+	return false
 }
 
 func WriteDirToTar(tw *tar.Writer, srcDir, tarDir string, uid, gid int, forceExec bool) error {

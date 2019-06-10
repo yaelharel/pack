@@ -57,8 +57,7 @@ func readTOML(path string) (buildpackTOML, error) {
 		err error
 	)
 	if filepath.Ext(path) == ".tgz" {
-		// TODO
-		_, buf, err = archive.ReadTarEntry(path, "./buildpack.toml")
+		_, buf, err = archive.ReadTarEntry(path, "./buildpack.toml", "buildpack.toml", "/buildpack.toml")
 	} else {
 		buf, err = ioutil.ReadFile(filepath.Join(path, "buildpack.toml"))
 	}

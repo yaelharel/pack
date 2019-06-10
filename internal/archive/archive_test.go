@@ -43,6 +43,39 @@ func testArchive(t *testing.T, when spec.G, it spec.S) {
 		}
 	})
 
+	when.Focus("#ReadTarEntry", func() {
+		var (
+			err     error
+			tarFile *os.File
+		)
+		it.Before(func() {
+			tarFile, err = ioutil.TempFile(tmpDir, "file.tgz")
+			h.AssertNil(t, err)
+
+			err = archive.CreateSingleFileTar(tarFile.Name(), "./file1", "file-1 content")
+			h.AssertNil(t, err)
+		})
+
+		it.After(func() {
+			_ = tarFile.Close()
+		})
+
+		when("multiple paths are provided", func() {
+			it("returns the first match", func() {
+				_, bytes, err := archive.ReadTarEntry(tarFile.Name(), "file1", "./file1")
+				h.AssertNil(t, err)
+				h.AssertEq(t, string(bytes), "file-1 content")
+			})
+
+
+			it("skips non-existent files", func() {
+				_, bytes, err := archive.ReadTarEntry(tarFile.Name(), "file2", "./file1")
+				h.AssertNil(t, err)
+				h.AssertEq(t, string(bytes), "file-1 content")
+			})
+		})
+	})
+
 	when("#WriteDirToTar", func() {
 		var src string
 		it.Before(func() {
