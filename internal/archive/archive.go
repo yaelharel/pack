@@ -64,6 +64,7 @@ func CreateSingleFileTar(tarFile, path, txt string) error {
 	if err != nil {
 		return fmt.Errorf("create file for tar: %s", err)
 	}
+	defer fh.Close()
 
 	tw := tar.NewWriter(fh)
 	if err := tw.WriteHeader(&tar.Header{
@@ -81,7 +82,7 @@ func CreateSingleFileTar(tarFile, path, txt string) error {
 	return tw.Close()
 }
 
-func ReadTarEntry(tarPath string, entryPath... string) (*tar.Header, []byte, error) {
+func ReadTarEntry(tarPath string, entryPath ...string) (*tar.Header, []byte, error) {
 	var (
 		tarFile    *os.File
 		gzipReader *gzip.Reader

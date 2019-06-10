@@ -67,7 +67,6 @@ func testArchive(t *testing.T, when spec.G, it spec.S) {
 				h.AssertEq(t, string(bytes), "file-1 content")
 			})
 
-
 			it("skips non-existent files", func() {
 				_, bytes, err := archive.ReadTarEntry(tarFile.Name(), "file2", "./file1")
 				h.AssertNil(t, err)
