@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"github.com/buildpack/pack/internal/paths"
 
 	"github.com/buildpack/pack"
 	"github.com/buildpack/pack/builder"
@@ -91,10 +92,13 @@ func transformRelativePath(uri, relativeTo string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	if parsed.Scheme == "" {
 		if !filepath.IsAbs(parsed.Path) {
-			return strings.Replace(fmt.Sprintf("file://"+filepath.Join(relativeTo, parsed.Path)), `\`, `/`, -1), nil
+			absPath := filepath.Join(relativeTo, parsed.Path)
+			return paths.FilePathToUri(absPath)
 		}
 	}
+
 	return uri, nil
 }

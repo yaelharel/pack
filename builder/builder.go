@@ -492,7 +492,7 @@ func (b *Builder) embedBuildpackTar(tw *tar.Writer, srcTar, baseTarDir string) e
 	tarFile, err = os.Open(srcTar)
 	fhFinal = tarFile
 	if err != nil {
-		return errors.Wrapf(err, "failed to open '%s'", srcTar)
+		return errors.Wrapf(err, "failed to open buildpack tar '%s'", srcTar)
 	}
 	defer tarFile.Close()
 
@@ -553,7 +553,7 @@ func (b *Builder) embedLifecycleTar(tw *tar.Writer, srcTar string) error {
 	tarFile, err = os.Open(srcTar)
 	fhFinal = tarFile
 	if err != nil {
-		return errors.Wrapf(err, "failed to open '%s'", srcTar)
+		return errors.Wrapf(err, "failed to open lifecycle tar '%s'", srcTar)
 	}
 	defer tarFile.Close()
 

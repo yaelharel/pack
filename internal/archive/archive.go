@@ -92,7 +92,7 @@ func ReadTarEntry(tarPath string, entryPath string) (*tar.Header, []byte, error)
 	tarFile, err = os.Open(tarPath)
 	fhFinal = tarFile
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "failed to open '%s'", tarPath)
+		return nil, nil, errors.Wrapf(err, "failed to open tar '%s'", tarPath)
 	}
 	defer tarFile.Close()
 

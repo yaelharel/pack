@@ -9,9 +9,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
+	"regexp"
 
 	"github.com/pkg/errors"
+
+	"github.com/buildpack/pack/internal/paths"
 
 	"github.com/buildpack/pack/logging"
 )
@@ -21,6 +23,8 @@ type Downloader struct {
 	cacheDir string
 }
 
+var schemeRegexp = regexp.MustCompile(`^.*://.*`)
+
 func NewDownloader(logger logging.Logger, cacheDir string) *Downloader {
 	return &Downloader{
 		logger:   logger,
@@ -28,20 +32,38 @@ func NewDownloader(logger logging.Logger, cacheDir string) *Downloader {
 	}
 }
 
-func (d *Downloader) Download(uri string) (string, error) {
-	parsedUrl, err := url.Parse(uri)
-	if err != nil {
-		return "", err
+func (d *Downloader) Download(pathOrUri string) (string, error) {
+
+	hasScheme := schemeRegexp.MatchString(pathOrUri)
+	if hasScheme {
+		parsedUrl, err := url.Parse(pathOrUri)
+		if err != nil {
+			return "", err
+		}
+
+		switch parsedUrl.Scheme {
+		case "file":
+			return paths.UriToFilePath(pathOrUri)
+		case "http", "https":
+			return d.handleHTTP(pathOrUri)
+		default:
+			return "", fmt.Errorf("unsupported protocol '%s' in URI %q", parsedUrl.Scheme, pathOrUri)
+		}
+	} else {
+		return d.handleFile(pathOrUri)
+	}
+}
+
+func (d *Downloader) handleFile(path string) (string, error) {
+	var (
+		err error
+	)
+
+	if path, err = filepath.Abs(path); err != nil {
+		return "", nil
 	}
 
-	switch parsedUrl.Scheme {
-	case "", "file":
-		return strings.TrimPrefix(uri, "file://"), nil
-	case "http", "https":
-		return d.handleHTTP(uri)
-	default:
-		return "", fmt.Errorf("unsupported protocol in URI %q", uri)
-	}
+	return path, nil
 }
 
 func (d *Downloader) handleHTTP(uri string) (string, error) {
@@ -79,6 +101,7 @@ func (d *Downloader) handleHTTP(uri string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer fh.Close()
 
 	_, err = io.Copy(fh, reader)
 	if err != nil {

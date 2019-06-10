@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
+
+	"github.com/buildpack/pack/internal/paths"
 
 	"github.com/onsi/gomega/ghttp"
 	"github.com/sclevine/spec"
@@ -31,10 +32,6 @@ func testDownloader(t *testing.T, when spec.G, it spec.S) {
 		)
 
 		it.Before(func() {
-			if runtime.GOOS == "windows" {
-				t.Skip("do not run on windows")
-			}
-
 			tmpDir, err = ioutil.TempDir("", "")
 			h.AssertNil(t, err)
 
@@ -87,7 +84,10 @@ func testDownloader(t *testing.T, when spec.G, it spec.S) {
 			absPath, err := filepath.Abs(filepath.Join("testdata", "downloader", "dirA"))
 			h.AssertNil(t, err)
 
-			out, err := subject.Download("file://" + absPath)
+			uri, err := paths.FilePathToUri(absPath)
+			h.AssertNil(t, err)
+
+			out, err := subject.Download(uri)
 			h.AssertNil(t, err)
 			h.AssertNotEq(t, out, "")
 			h.AssertDirContainsFileWithContents(t, out, "file.txt", "some file contents")
@@ -97,7 +97,10 @@ func testDownloader(t *testing.T, when spec.G, it spec.S) {
 			absPath, err := filepath.Abs(filepath.Join("testdata", "downloader", "dirA.tgz"))
 			h.AssertNil(t, err)
 
-			out, err := subject.Download("file://" + absPath)
+			uri, err := paths.FilePathToUri(absPath)
+			h.AssertNil(t, err)
+
+			out, err := subject.Download(uri)
 			h.AssertNil(t, err)
 			h.AssertMatch(t, out, `\.tgz$`)
 			h.AssertOnTarEntry(t, out, "./file.txt", h.ContentEquals("some file contents"))

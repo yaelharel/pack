@@ -73,7 +73,7 @@ func validateTarEntries(tarPath string, entryPath ...string) error {
 	tarFile, err = os.Open(tarPath)
 	fhFinal = tarFile
 	if err != nil {
-		return errors.Wrapf(err, "failed to open '%s'", tarPath)
+		return errors.Wrapf(err, "failed to open tar '%s' for validation", tarPath)
 	}
 	defer tarFile.Close()
 

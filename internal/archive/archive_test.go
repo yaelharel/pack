@@ -43,10 +43,6 @@ func testArchive(t *testing.T, when spec.G, it spec.S) {
 		}
 	})
 
-	when("#MergeTars", func() {
-
-	})
-
 	when("#WriteDirToTar", func() {
 		var src string
 		it.Before(func() {
