@@ -95,13 +95,13 @@ func (l *Lifecycle) Execute(ctx context.Context, opts LifecycleOptions) error {
 	}
 
 	l.logger.Debug(style.Step("ANALYZING"))
-	if opts.ClearCache {
-		l.logger.Debug("Skipping 'analyze' due to clearing cache")
-	} else {
-		if err := l.Analyze(ctx, opts.Image.Name(), opts.Publish); err != nil {
-			return err
-		}
+	//if opts.ClearCache {
+	//	l.logger.Debug("Skipping 'analyze' due to clearing cache")
+	//} else {
+	if err := l.Analyze(ctx, opts.Image.Name(), opts.Publish); err != nil {
+		return err
 	}
+	//}
 
 	l.logger.Debug(style.Step("BUILDING"))
 	if err := l.Build(ctx); err != nil {

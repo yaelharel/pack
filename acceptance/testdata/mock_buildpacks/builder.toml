@@ -29,3 +29,6 @@
   run-image = "pack-test/run"
 
 # run-image-mirror and lifecycle are appended by accpetance tests
+[lifecycle]
+uri = "/Users/pivotal/workspace/lifecycle/out/lifecycle-dev+linux.x86-64.tgz"
+version = "0.3.0"

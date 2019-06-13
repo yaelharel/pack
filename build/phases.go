@@ -157,6 +157,7 @@ func (l *Lifecycle) newExport(repoName, runImage string, publish bool, launchCac
 					"-daemon",
 					"-launch-cache", launchCacheDir,
 					repoName,
+					//"foobar:another-cool-tag",
 				),
 				WithBinds(fmt.Sprintf("%s:%s", launchCacheName, launchCacheDir)),
 			)
@@ -171,6 +172,7 @@ func (l *Lifecycle) newExport(repoName, runImage string, publish bool, launchCac
 					"-group", groupPath,
 					"-daemon",
 					repoName,
+					//"foobar:another-cool-tag",
 				),
 			)
 		}
