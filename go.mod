@@ -14,6 +14,7 @@ require (
 	github.com/google/go-cmp v0.3.0
 	github.com/google/go-containerregistry v0.0.0-20190503220729-1c6c7f61e8a5
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/magefile/mage v1.8.0
 	github.com/mattn/go-colorable v0.0.9 // indirect
 	github.com/mattn/go-isatty v0.0.4 // indirect
 	github.com/onsi/gomega v1.5.0

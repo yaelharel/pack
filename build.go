@@ -272,7 +272,7 @@ func isBuildpackId(path string) bool {
 	return true
 }
 
-func (c *Client) parseBuildpack(bp string) (string, string) {
+func (c *Client)   parseBuildpack(bp string) (string, string) {
 	parts := strings.Split(bp, "@")
 	if len(parts) == 2 {
 		return parts[0], parts[1]
