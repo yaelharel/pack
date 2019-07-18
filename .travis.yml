@@ -17,6 +17,7 @@ jobs:
         - make
     - name: tests
       os: osx
+      osx_image: xcode11
       env:
         - NO_DOCKER=true
         - GO111MODULE=on
@@ -28,7 +29,3 @@ jobs:
         - GO111MODULE=on
       script: go test -mod=vendor -count=1 -parallel=1 -v ./...
       after_success: go build -mod=vendor -o pack ./cmd/pack
-
-branches:
-  only:
-    - master
