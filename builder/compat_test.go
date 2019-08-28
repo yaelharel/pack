@@ -33,7 +33,7 @@ func testCompat(t *testing.T, when spec.G, it spec.S) {
 	)
 
 	it.Before(func() {
-		baseImage = fakes.NewImage("base/image", "", "")
+		baseImage = fakes.NewImage("base/image", "", nil)
 	})
 
 	it.After(func() {

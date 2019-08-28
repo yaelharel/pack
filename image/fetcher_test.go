@@ -29,7 +29,7 @@ func TestFetcher(t *testing.T) {
 
 	h.RequireDocker(t)
 
-	registryConfig = h.RunRegistry(t, false)
+	registryConfig = h.RunRegistry(t)
 	defer registryConfig.StopRegistry(t)
 
 	//TODO: is there a better solution to the auth problem?
@@ -56,7 +56,7 @@ func testFetcher(t *testing.T, when spec.G, it spec.S) {
 
 	when("#Fetch", func() {
 		when("daemon is false", func() {
-			when("there is a remote image", func() {
+			when.Focus("there is a remote image", func() {
 				it.Before(func() {
 					h.CreateImageOnRemote(
 						t,

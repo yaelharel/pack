@@ -226,9 +226,10 @@ func CreateImageOnLocal(t *testing.T, dockerCli *client.Client, repoName, docker
 func CreateImageOnRemote(t *testing.T, dockerCli *client.Client, registryConfig *TestRegistryConfig, repoName, dockerFile string) string {
 	t.Helper()
 	imageName := registryConfig.RepoName(repoName)
-
-	defer DockerRmi(dockerCli, imageName)
+	
 	CreateImageOnLocal(t, dockerCli, imageName, dockerFile)
+	defer DockerRmi(dockerCli, imageName)
+	
 	AssertNil(t, PushImage(dockerCli, imageName, registryConfig))
 	return imageName
 }

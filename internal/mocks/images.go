@@ -13,7 +13,7 @@ import (
 )
 
 func NewFakeBuilderImage(t *testing.T, name string, buildpacks []builder.BuildpackMetadata, config builder.Config) *fakes.Image {
-	fakeBuilderImage := fakes.NewImage(name, "", "")
+	fakeBuilderImage := fakes.NewImage(name, "", nil)
 	h.AssertNil(t, fakeBuilderImage.SetLabel("io.buildpacks.stack.id", config.Stack.ID))
 	h.AssertNil(t, fakeBuilderImage.SetEnv("CNB_USER_ID", "1234"))
 	h.AssertNil(t, fakeBuilderImage.SetEnv("CNB_GROUP_ID", "4321"))

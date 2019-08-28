@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -13,7 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/buildpack/imgutil"
+	"github.com/buildpack/imgutil/local"
+
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -46,7 +48,7 @@ func TestPhase(t *testing.T) {
 	h.AssertNil(t, err)
 
 	repoName = "phase.test." + h.RandString(10)
-	CreateFakeLifecycleImage(t, dockerCli, repoName)
+	createFakeLifecycleImage(t, dockerCli, repoName)
 	defer h.DockerRmi(dockerCli, repoName)
 
 	spec.Run(t, "phase", testPhase, spec.Report(report.Terminal{}), spec.Parallel())
@@ -65,7 +67,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 		var err error
 		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
 		h.AssertNil(t, err)
-		subject, err = CreateFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger)
+		subject, err = createFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger)
 		h.AssertNil(t, err)
 	})
 
@@ -157,7 +159,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 
 					it("returns an error", func() {
 						logger := mocks.NewMockLogger(&outBuf)
-						subject, err = CreateFakeLifecycle(tmpFakeAppDir, docker, logger)
+						subject, err = createFakeLifecycle(tmpFakeAppDir, docker, logger)
 						h.AssertNil(t, err)
 
 						readPhase, err := subject.NewPhase(
@@ -241,7 +243,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 				var registry *h.TestRegistryConfig
 
 				it.Before(func() {
-					registry = h.RunRegistry(t, true)
+					registry = h.RunRegistry(t)
 				})
 
 				it.After(func() {
@@ -303,7 +305,7 @@ func assertRunSucceeds(t *testing.T, phase *build.Phase, outBuf *bytes.Buffer, e
 	phase.Cleanup()
 }
 
-func CreateFakeLifecycleImage(t *testing.T, dockerCli *client.Client, repoName string) {
+func createFakeLifecycleImage(t *testing.T, dockerCli *client.Client, repoName string) {
 	ctx := context.Background()
 
 	wd, err := os.Getwd()
@@ -321,16 +323,30 @@ func CreateFakeLifecycleImage(t *testing.T, dockerCli *client.Client, repoName s
 	res.Body.Close()
 }
 
-func CreateFakeLifecycle(appDir string, docker *client.Client, logger logging.Logger) (*build.Lifecycle, error) {
+func createFakeLifecycle(appDir string, docker *client.Client, logger logging.Logger) (*build.Lifecycle, error) {
 	subject := build.NewLifecycle(docker, logger)
-	builderImage, err := imgutil.NewLocalImage(repoName, docker)
+	builderImage, err := local.NewImage(repoName, docker)
+	if err != nil {
+		return nil, errors.Wrap(err, "new builder image")
+	}
+
+	err = builderImage.SetEnv("CNB_USER_ID", "111")
+	if err != nil {
+		return nil, err
+	}
+	err = builderImage.SetEnv("CNB_GROUP_ID", "222")
 	if err != nil {
 		return nil, err
 	}
 
-	bldr, err := builder.GetBuilder(builderImage)
+	err = builderImage.SetLabel("io.buildpacks.stack.id", "some.stack.id")
 	if err != nil {
 		return nil, err
+	}
+	
+	bldr, err := builder.New(builderImage, repoName)
+	if err != nil {
+		return nil, errors.Wrap(err, "get builder")
 	}
 
 	subject.Setup(build.LifecycleOptions{
@@ -339,6 +355,7 @@ func CreateFakeLifecycle(appDir string, docker *client.Client, logger logging.Lo
 		HTTPProxy:  "some-http-proxy",
 		HTTPSProxy: "some-https-proxy",
 		NoProxy:    "some-no-proxy",
+		
 	})
 	return subject, nil
 }

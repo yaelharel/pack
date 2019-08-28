@@ -69,7 +69,7 @@ func TestAcceptance(t *testing.T) {
 	dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
 	h.AssertNil(t, err)
 
-	registryConfig = h.RunRegistry(t, false)
+	registryConfig = h.RunRegistry(t)
 	defer registryConfig.StopRegistry(t)
 
 	runImageMirror := registryConfig.RepoName(runImage)

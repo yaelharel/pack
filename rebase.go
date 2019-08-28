@@ -61,10 +61,12 @@ func (c *Client) Rebase(ctx context.Context, opts RebaseOptions) error {
 		return err
 	}
 
-	md.RunImage.SHA, err = baseImage.Digest()
+	identifier, err := baseImage.Identifier()
 	if err != nil {
 		return err
 	}
+
+	md.RunImage.Reference = identifier.String()
 
 	md.RunImage.TopLayer, err = baseImage.TopLayer()
 	if err != nil {
@@ -76,10 +78,17 @@ func (c *Client) Rebase(ctx context.Context, opts RebaseOptions) error {
 		return err
 	}
 
-	sha, err := appImage.Save()
+	err = appImage.Save()
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("New sha: %s", style.Symbol(sha))
+
+	appImageId, err := appImage.Identifier()
+	if err != nil {
+		return err
+	}
+
+	c.logger.Infof("New sha: %s", style.Symbol(appImageId.String()))
+
 	return nil
 }

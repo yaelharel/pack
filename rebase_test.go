@@ -5,6 +5,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/buildpack/imgutil/local"
+
 	"github.com/buildpack/imgutil/fakes"
 	"github.com/fatih/color"
 	"github.com/sclevine/spec"
@@ -32,15 +34,15 @@ func testRebase(t *testing.T, when spec.G, it spec.S) {
 		it.Before(func() {
 			fakeImageFetcher = mocks.NewFakeImageFetcher()
 
-			fakeAppImage = fakes.NewImage("some/app", "", "")
+			fakeAppImage = fakes.NewImage("some/app", "", nil)
 			h.AssertNil(t, fakeAppImage.SetLabel("io.buildpacks.lifecycle.metadata",
 				`{"stack":{"runImage":{"image":"some/run", "mirrors":["example.com/some/run"]}}}`))
 			fakeImageFetcher.LocalImages["some/app"] = fakeAppImage
 
-			fakeRunImage = fakes.NewImage("some/run", "run-image-top-layer-sha", "run-image-digest")
+			fakeRunImage = fakes.NewImage("some/run", "run-image-top-layer-sha", local.IDIdentifier{ImageID: "run-image-digest"})
 			fakeImageFetcher.LocalImages["some/run"] = fakeRunImage
 
-			fakeRunImageMirror = fakes.NewImage("example.com/some/run", "mirror-top-layer-sha", "mirror-digest")
+			fakeRunImageMirror = fakes.NewImage("example.com/some/run", "mirror-top-layer-sha", local.IDIdentifier{ImageID: "mirror-digest"})
 			fakeImageFetcher.LocalImages["example.com/some/run"] = fakeRunImageMirror
 
 			subject = &Client{
@@ -61,7 +63,7 @@ func testRebase(t *testing.T, when spec.G, it spec.S) {
 					var fakeCustomRunImage *fakes.Image
 
 					it.Before(func() {
-						fakeCustomRunImage = fakes.NewImage("custom/run", "custom-base-top-layer-sha", "custom-base-digest")
+						fakeCustomRunImage = fakes.NewImage("custom/run", "custom-base-top-layer-sha", local.IDIdentifier{ImageID: "custom-base-digest"})
 						fakeImageFetcher.LocalImages["custom/run"] = fakeCustomRunImage
 					})
 
@@ -115,7 +117,7 @@ func testRebase(t *testing.T, when spec.G, it spec.S) {
 						)
 						it.Before(func() {
 							fakeImageFetcher.LocalImages["example.com/some/app"] = fakeAppImage
-							fakeLocalMirror = fakes.NewImage("example.com/some/local-run", "local-mirror-top-layer-sha", "local-mirror-digest")
+							fakeLocalMirror = fakes.NewImage("example.com/some/local-run", "local-mirror-top-layer-sha", local.IDIdentifier{ImageID: "local-mirror-digest"})
 							fakeImageFetcher.LocalImages["example.com/some/local-run"] = fakeLocalMirror
 						})
 
@@ -154,7 +156,7 @@ func testRebase(t *testing.T, when spec.G, it spec.S) {
 				)
 
 				it.Before(func() {
-					fakeRemoteRunImage = fakes.NewImage("some/run", "remote-top-layer-sha", "remote-digest")
+					fakeRemoteRunImage = fakes.NewImage("some/run", "remote-top-layer-sha", local.IDIdentifier{ImageID: "remote-digest"})
 					fakeImageFetcher.RemoteImages["some/run"] = fakeRemoteRunImage
 				})
 

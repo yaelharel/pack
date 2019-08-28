@@ -296,8 +296,7 @@ func (b *Builder) Save() error {
 		return errors.Wrap(err, "failed to set working dir")
 	}
 
-	_, err = b.image.Save()
-	return err
+	return b.image.Save()
 }
 
 func processOrder(buildpacks []BuildpackMetadata, order *Order) error {
