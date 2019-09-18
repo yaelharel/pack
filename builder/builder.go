@@ -19,11 +19,14 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/buildpack/pack/api"
+	"github.com/buildpack/pack/cmd"
 	"github.com/buildpack/pack/internal/archive"
 	"github.com/buildpack/pack/style"
 )
 
 const (
+	packName = "Pack CLI"
+
 	cnbDir        = "/cnb"
 	buildpacksDir = "/cnb/buildpacks"
 	orderPath     = "/cnb/order.toml"
@@ -32,9 +35,12 @@ const (
 	lifecycleDir  = "/cnb/lifecycle"
 	workspaceDir  = "/workspace"
 	layersDir     = "/layers"
+
+	metadataLabel = "io.buildpacks.builder.metadata"
 	stackLabel    = "io.buildpacks.stack.id"
-	envUID        = "CNB_USER_ID"
-	envGID        = "CNB_GROUP_ID"
+
+	envUID = "CNB_USER_ID"
+	envGID = "CNB_GROUP_ID"
 )
 
 type Builder struct {
@@ -67,12 +73,12 @@ type BuildpackRef struct {
 
 // GetBuilder constructs builder from builder image
 func GetBuilder(img imgutil.Image) (*Builder, error) {
-	label, err := img.Label(MetadataLabel)
+	label, err := img.Label(metadataLabel)
 	if err != nil {
-		return nil, errors.Wrapf(err, "get label %s from image %s", style.Symbol(MetadataLabel), style.Symbol(img.Name()))
+		return nil, errors.Wrapf(err, "get label %s from image %s", style.Symbol(metadataLabel), style.Symbol(img.Name()))
 	}
 	if label == "" {
-		return nil, fmt.Errorf("builder %s missing label %s -- try recreating builder", style.Symbol(img.Name()), style.Symbol(MetadataLabel))
+		return nil, fmt.Errorf("builder %s missing label %s -- try recreating builder", style.Symbol(img.Name()), style.Symbol(metadataLabel))
 	}
 
 	return constructBuilder(img, "", label)
@@ -80,9 +86,9 @@ func GetBuilder(img imgutil.Image) (*Builder, error) {
 
 // New constructs a new builder from base image
 func New(baseImage imgutil.Image, name string) (*Builder, error) {
-	label, err := baseImage.Label(MetadataLabel)
+	label, err := baseImage.Label(metadataLabel)
 	if err != nil {
-		return nil, errors.Wrapf(err, "get label %s from image %s", style.Symbol(MetadataLabel), style.Symbol(baseImage.Name()))
+		return nil, errors.Wrapf(err, "get label %s from image %s", style.Symbol(metadataLabel), style.Symbol(baseImage.Name()))
 	}
 
 	return constructBuilder(baseImage, name, label)
@@ -158,6 +164,10 @@ func (b *Builder) GetLifecycleDescriptor() LifecycleDescriptor {
 
 func (b *Builder) GetBuildpacks() []BuildpackMetadata {
 	return b.metadata.Buildpacks
+}
+
+func (b *Builder) GetCreatedBy() CreatorMetadata {
+	return b.metadata.CreatedBy
 }
 
 func (b *Builder) GetOrder() Order {
@@ -292,12 +302,17 @@ func (b *Builder) Save() error {
 		return errors.Wrap(err, "adding env layer")
 	}
 
+	b.metadata.CreatedBy = CreatorMetadata{
+		Name:    packName,
+		Version: cmd.Version,
+	}
+
 	label, err := json.Marshal(b.metadata)
 	if err != nil {
 		return errors.Wrap(err, "failed marshal builder image metadata")
 	}
 
-	if err := b.image.SetLabel(MetadataLabel, string(label)); err != nil {
+	if err := b.image.SetLabel(metadataLabel, string(label)); err != nil {
 		return errors.Wrap(err, "failed to set metadata label")
 	}
 

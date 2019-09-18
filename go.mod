@@ -11,6 +11,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/fatih/color v1.7.0
 	github.com/golang/mock v1.3.1
+	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.3.0
 	github.com/google/go-containerregistry v0.0.0-20190503220729-1c6c7f61e8a5
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
@@ -22,6 +23,8 @@ require (
 	github.com/sclevine/spec v1.2.0
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.3 // indirect
+	golang.org/x/net v0.0.0-20190613194153-d28f0bde5980 // indirect
+	golang.org/x/sys v0.0.0-20190801041406-cbf593c0f2f3 // indirect
 	golang.org/x/tools v0.0.0-20190425150028-36563e24a262
 )
 
