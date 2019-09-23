@@ -32,7 +32,7 @@ const (
 	lifecycleDir  = "/cnb/lifecycle"
 	workspaceDir  = "/workspace"
 	layersDir     = "/layers"
-	stackLabel    = "io.buildpacks.stack.id"
+	stackIDLabel  = "io.buildpacks.stack.id"
 	envUID        = "CNB_USER_ID"
 	envGID        = "CNB_GROUP_ID"
 )
@@ -94,12 +94,12 @@ func constructBuilder(img imgutil.Image, newName string, label string) (*Builder
 		return nil, err
 	}
 
-	stackID, err := img.Label(stackLabel)
+	stackID, err := img.Label(stackIDLabel)
 	if err != nil {
-		return nil, errors.Wrapf(err, "get label %s from image %s", style.Symbol(stackLabel), style.Symbol(img.Name()))
+		return nil, errors.Wrapf(err, "get label %s from image %s", style.Symbol(stackIDLabel), style.Symbol(img.Name()))
 	}
 	if stackID == "" {
-		return nil, fmt.Errorf("image %s missing label %s", style.Symbol(img.Name()), style.Symbol(stackLabel))
+		return nil, fmt.Errorf("image %s missing label %s", style.Symbol(img.Name()), style.Symbol(stackIDLabel))
 	}
 
 	var metadata Metadata

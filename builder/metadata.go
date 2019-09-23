@@ -1,6 +1,13 @@
 package builder
 
 const MetadataLabel = "io.buildpacks.builder.metadata"
+const StackLabel = "io.buildpacks.stack.metadata"
+
+// TODO: Come up with better name
+type StackInfo struct {
+	ID string `json:"id"`
+	Mixins []string `json:"mixins"`
+}
 
 type Metadata struct {
 	Description string              `json:"description"`
@@ -27,6 +34,7 @@ type StackMetadata struct {
 type RunImageMetadata struct {
 	Image   string   `json:"image" toml:"image"`
 	Mirrors []string `json:"mirrors" toml:"mirrors"`
+	Mixins []string `json:mixins`
 }
 
 func processMetadata(md *Metadata) error {

@@ -705,6 +705,7 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 				h.AssertEq(t, baseImage.IsSaved(), true)
 			})
 
+			// TODO: Include mixins?
 			it("adds the stack.toml to the image", func() {
 				layerTar, err := baseImage.FindLayerWithPath("/cnb/stack.toml")
 				h.AssertNil(t, err)
