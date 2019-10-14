@@ -54,7 +54,7 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 				})
 			})
 
-			when("default is missing from blobs", func() {
+			when("default is missing from buildpacks", func() {
 				it("returns error", func() {
 					subject.SetDefaultBuildpack(dist.BuildpackInfo{
 						ID:      "buildpack.1.id",

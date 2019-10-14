@@ -5,9 +5,9 @@ import "github.com/buildpack/pack/dist"
 const MetadataLabel = "io.buildpacks.buildpackage.metadata"
 
 type Config struct {
-	Default dist.BuildpackInfo `toml:"default"`
-	Blobs   []dist.BlobConfig  `toml:"blobs"`
-	Stacks  []dist.Stack       `toml:"stacks"`
+	Default    dist.BuildpackInfo `toml:"default"`
+	Buildpacks []dist.Location    `toml:"buildpacks"`
+	Stacks     []dist.Stack       `toml:"stacks"`
 }
 
 type Metadata struct {

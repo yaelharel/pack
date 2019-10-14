@@ -73,7 +73,7 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 							ID:      "bp.one",
 							Version: "1.2.3",
 						},
-						Blobs: []dist.BlobConfig{
+						Buildpacks: []dist.Location{
 							{URI: "https://example.com/bp.one.tgz"},
 						},
 						Stacks: []dist.Stack{

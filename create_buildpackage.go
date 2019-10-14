@@ -19,7 +19,7 @@ type CreatePackageOptions struct {
 func (c *Client) CreatePackage(ctx context.Context, opts CreatePackageOptions) error {
 	packageBuilder := buildpackage.NewBuilder(c.imageFactory)
 
-	for _, bc := range opts.Config.Blobs {
+	for _, bc := range opts.Config.Buildpacks {
 		blob, err := c.downloader.Download(ctx, bc.URI)
 		if err != nil {
 			return errors.Wrapf(err, "downloading buildpack from %s", style.Symbol(bc.URI))

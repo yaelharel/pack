@@ -1,13 +1,13 @@
 package dist
 
-type BlobConfig struct {
-	URI string `toml:"uri"`
-}
-
 type Order []OrderEntry
 
 type OrderEntry struct {
 	Group []BuildpackRef `toml:"group" json:"group"`
+}
+
+type Location struct {
+	URI string `toml:"uri"`
 }
 
 type BuildpackRef struct {
