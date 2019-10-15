@@ -40,8 +40,8 @@ func WithImageFactory(f ImageFactory) ClientOption {
 	}
 }
 
-// WithFetcher supply your own fetcher.
-func WithFetcher(f ImageFetcher) ClientOption {
+// WithImageFetcher supply your own image fetcher.
+func WithImageFetcher(f ImageFetcher) ClientOption {
 	return func(c *Client) {
 		c.imageFetcher = f
 	}

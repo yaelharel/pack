@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/buildpack/imgutil/fakes"
@@ -35,23 +38,30 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 		mockController   *gomock.Controller
 		mockDownloader   *testmocks.MockDownloader
 		mockImageFactory *testmocks.MockImageFactory
+		mockImageFetcher *testmocks.MockImageFetcher
 		fakePackageImage *fakes.Image
+		tmpDir           string
 		out              bytes.Buffer
 	)
 
 	it.Before(func() {
 		mockController = gomock.NewController(t)
 		mockDownloader = testmocks.NewMockDownloader(mockController)
+		mockImageFetcher = testmocks.NewMockImageFetcher(mockController)
 		mockImageFactory = testmocks.NewMockImageFactory(mockController)
 
 		fakePackageImage = fakes.NewImage("some/package", "", "")
 		mockImageFactory.EXPECT().NewImage("some/package", true).Return(fakePackageImage, nil).AnyTimes()
 
 		var err error
+		tmpDir, err = ioutil.TempDir("", "create-package-layers")
+		h.AssertNil(t, err)
+
 		client, err = pack.NewClient(
 			pack.WithLogger(logging.NewLogWithWriters(&out, &out)),
 			pack.WithDownloader(mockDownloader),
 			pack.WithImageFactory(mockImageFactory),
+			pack.WithImageFetcher(mockImageFetcher),
 		)
 		h.AssertNil(t, err)
 	})
@@ -63,7 +73,10 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 
 	when("#CreatePackage", func() {
 		when("package config is valid", func() {
-			var opts pack.CreatePackageOptions
+			var (
+				opts                     pack.CreatePackageOptions
+				fakeExistingPackageImage *fakes.Image
+			)
 
 			it.Before(func() {
 				opts = pack.CreatePackageOptions{
@@ -76,13 +89,16 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 						Buildpacks: []dist.Location{
 							{URI: "https://example.com/bp.one.tgz"},
 						},
+						Packages: []dist.ImageRef{
+							{Reference: "package/bp2-bp3"},
+						},
 						Stacks: []dist.Stack{
 							{ID: "some.stack.id"},
 						},
 					},
 				}
 
-				buildpack, err := ifakes.NewBuildpackFromDescriptor(dist.BuildpackDescriptor{
+				bp1, err := ifakes.NewBuildpackFromDescriptor(dist.BuildpackDescriptor{
 					API: api.MustParse("0.2"),
 					Info: dist.BuildpackInfo{
 						ID:      "bp.one",
@@ -93,10 +109,50 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 					},
 					Order: nil,
 				}, 0644)
-
 				h.AssertNil(t, err)
 
-				mockDownloader.EXPECT().Download(gomock.Any(), "https://example.com/bp.one.tgz").Return(buildpack, nil).AnyTimes()
+				mockDownloader.EXPECT().Download(gomock.Any(), "https://example.com/bp.one.tgz").Return(bp1, nil).AnyTimes()
+
+				bp2, err := ifakes.NewBuildpackFromDescriptor(dist.BuildpackDescriptor{
+					API: api.MustParse("0.2"),
+					Info: dist.BuildpackInfo{
+						ID:      "bp.two",
+						Version: "4.5.6",
+					},
+					Stacks: []dist.Stack{
+						{ID: "some.stack.id"},
+					},
+					Order: nil,
+				}, 0644)
+				h.AssertNil(t, err)
+
+				bp3, err := ifakes.NewBuildpackFromDescriptor(dist.BuildpackDescriptor{
+					API: api.MustParse("0.2"),
+					Info: dist.BuildpackInfo{
+						ID:      "bp.three",
+						Version: "7.8.9",
+					},
+					Stacks: []dist.Stack{
+						{ID: "some.stack.id"},
+					},
+					Order: nil,
+				}, 0644)
+				h.AssertNil(t, err)
+
+				fakeExistingPackageImage = fakes.NewImage("package/bp2-bp3", "", "")
+				h.AssertNil(t, err)
+
+				addBuildpackToImage(t, tmpDir, fakeExistingPackageImage, bp2)
+				addBuildpackToImage(t, tmpDir, fakeExistingPackageImage, bp3)
+
+				_, err = fakeExistingPackageImage.Save()
+				h.AssertNil(t, err)
+
+				mockImageFetcher.EXPECT().Fetch(context.TODO(), "package/bp2-bp3", true, true).Return(fakeExistingPackageImage, nil)
+			})
+
+			it.After(func() {
+				fakeExistingPackageImage.Cleanup()
 			})
 
 			it("sets metadata", func() {
@@ -118,25 +174,9 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 				h.AssertNil(t, client.CreatePackage(context.TODO(), opts))
 				h.AssertEq(t, fakePackageImage.IsSaved(), true)
 
-				dirPath := fmt.Sprintf("/cnb/buildpacks/%s/%s", "bp.one", "1.2.3")
-				layerTar, err := fakePackageImage.FindLayerWithPath(dirPath)
-				h.AssertNil(t, err)
-
-				h.AssertOnTarEntry(t, layerTar, dirPath,
-					h.IsDirectory(),
-				)
-
-				h.AssertOnTarEntry(t, layerTar, dirPath+"/bin/build",
-					h.ContentEquals("build-contents"),
-					h.HasOwnerAndGroup(0, 0),
-					h.HasFileMode(0644),
-				)
-
-				h.AssertOnTarEntry(t, layerTar, dirPath+"/bin/detect",
-					h.ContentEquals("detect-contents"),
-					h.HasOwnerAndGroup(0, 0),
-					h.HasFileMode(0644),
-				)
+				assertLayerExists(t, fakePackageImage, "bp.one", "1.2.3")
+				assertLayerExists(t, fakePackageImage, "bp.two", "4.5.6")
+				assertLayerExists(t, fakePackageImage, "bp.three", "7.8.9")
 			})
 
 			when("when publish is true", func() {
@@ -160,4 +200,46 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 			})
 		})
 	})
+}
+
+func addBuildpackToImage(t *testing.T, tmpDir string, image *fakes.Image, bp dist.Buildpack) {
+	tarFile, err := ioutil.TempFile(tmpDir, "bp-*.tar")
+	h.AssertNil(t, err)
+
+	defer func() {
+		h.AssertNil(t, tarFile.Close())
+		h.AssertNil(t, os.Remove(tarFile.Name()))
+	}()
+
+	r, err := bp.Open()
+	h.AssertNil(t, err)
+
+	_, err = io.Copy(tarFile, r)
+	h.AssertNil(t, err)
+
+	h.AssertNil(t, image.AddLayer(tarFile.Name()))
+}
+
+func assertLayerExists(t *testing.T, image *fakes.Image, id, version string) {
+	t.Helper()
+	
+	dirPath := fmt.Sprintf("/cnb/buildpacks/%s/%s", id, version)
+	layerTar, err := image.FindLayerWithPath(dirPath)
+	h.AssertNil(t, err)
+
+	h.AssertOnTarEntry(t, layerTar, dirPath,
+		h.IsDirectory(),
+	)
+
+	h.AssertOnTarEntry(t, layerTar, dirPath+"/bin/build",
+		h.ContentEquals("build-contents"),
+		h.HasOwnerAndGroup(0, 0),
+		h.HasFileMode(0644),
+	)
+
+	h.AssertOnTarEntry(t, layerTar, dirPath+"/bin/detect",
+		h.ContentEquals("detect-contents"),
+		h.HasOwnerAndGroup(0, 0),
+		h.HasFileMode(0644),
+	)
 }
