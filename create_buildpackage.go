@@ -56,10 +56,19 @@ func (c *Client) CreatePackage(ctx context.Context, opts CreatePackageOptions) e
 			)
 		}
 
-		packageBuilder.AddPackage(&packageImage{
+		pkg := &packageImage{
 			img:      pkgImage,
 			bpLayers: bpLayers,
-		})
+		}
+
+		bps, err := pkg.Buildpacks()
+		if err != nil {
+			return errors.Wrap(err, "extracting package buildpacks")
+		}
+
+		for _, bp := range bps {
+			packageBuilder.AddBuildpack(bp)
+		}
 	}
 
 	packageBuilder.SetDefaultBuildpack(opts.Config.Default)
@@ -85,14 +94,37 @@ func (i *packageImage) Name() string {
 	return i.img.Name()
 }
 
-func (i *packageImage) BuildpackLayers() dist.BuildpackLayers {
-	return i.bpLayers
-}
+// func (i *packageImage) BuildpackLayers() dist.BuildpackLayers {
+// 	return i.bpLayers
+// }
 
-func (i *packageImage) GetLayer(diffID string) (io.ReadCloser, error) {
-	return i.img.GetLayer(diffID)
-}
+// func (i *packageImage) GetLayer(diffID string) (io.ReadCloser, error) {
+// 	return i.img.GetLayer(diffID)
+// }
 
 func (i *packageImage) Label(name string) (value string, err error) {
 	return i.img.Label(name)
+}
+
+func (i *packageImage) Buildpacks() ([]dist.Buildpack, error) {
+	var bps []dist.Buildpack
+	for bpID, v := range i.bpLayers {
+		for bpVersion, bpInfo := range v {
+			desc := dist.BuildpackDescriptor{
+				API: bpInfo.API,
+				Info: dist.BuildpackInfo{
+					ID:      bpID,
+					Version: bpVersion,
+				},
+				Stacks: bpInfo.Stacks,
+				Order:  bpInfo.Order,
+			}
+			bps = append(bps, dist.BuildpackImpl{
+				Blob: nil,
+			})
+		}
+	}
+
+	// TODO: REMOVE
+	return bps, nil
 }

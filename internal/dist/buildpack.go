@@ -1,7 +1,13 @@
 package dist
 
 import (
+	"archive/tar"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
+	"path"
+	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
@@ -17,12 +23,13 @@ type Blob interface {
 	Open() (io.ReadCloser, error)
 }
 
-type buildpack struct {
+// TODO: rename this
+type BuildpackImpl struct {
 	descriptor BuildpackDescriptor
 	Blob       `toml:"-"`
 }
 
-func (b *buildpack) Descriptor() BuildpackDescriptor {
+func (b *BuildpackImpl) Descriptor() BuildpackDescriptor {
 	return b.descriptor
 }
 
@@ -49,7 +56,10 @@ type Stack struct {
 	Mixins []string `json:"mixins,omitempty"`
 }
 
-func NewBuildpack(blob Blob) (Buildpack, error) {
+// NewBuildpack constructs a buildpack from a blob. It is assumed that the buildpack contents reside at the root of the
+// blob. The constructed buildpack contents will be structured as per the distribution spec (currently
+// '/cnbs/buildpacks/{ID}/{version}/*').
+func NewBuildpack(blob Blob) (*BuildpackImpl, error) {
 	bpd := BuildpackDescriptor{}
 	rc, err := blob.Open()
 	if err != nil {
@@ -73,7 +83,99 @@ func NewBuildpack(blob Blob) (Buildpack, error) {
 		return nil, errors.Wrapf(err, "invalid buildpack.toml")
 	}
 
-	return &buildpack{descriptor: bpd, Blob: blob}, nil
+	return &BuildpackImpl{descriptor: bpd, Blob: forDist(bpd, blob)}, nil
+}
+
+type distBlob struct {
+	r io.ReadCloser
+}
+
+func (b *distBlob) Open() (io.ReadCloser, error) {
+	return b.r, nil
+}
+
+func forDist(bpd BuildpackDescriptor, blob Blob) (Blob, error) {
+	pr, pw := io.Pipe()
+
+	tw := tar.NewWriter(pw)
+	defer tw.Close()
+
+	ts := archive.NormalizedDateTime
+
+	if err := tw.WriteHeader(&tar.Header{
+		Typeflag: tar.TypeDir,
+		Name:     path.Join(BuildpacksDir, bpd.EscapedID()),
+		Mode:     0755,
+		ModTime:  ts,
+	}); err != nil {
+		return nil, err
+	}
+
+	baseTarDir := path.Join(BuildpacksDir, bpd.EscapedID(), bpd.Info.Version)
+	if err := tw.WriteHeader(&tar.Header{
+		Typeflag: tar.TypeDir,
+		Name:     baseTarDir,
+		Mode:     0755,
+		ModTime:  ts,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := embedBuildpackTar2(tw, uid, gid, blob, baseTarDir); err != nil {
+		return nil, errors.Wrapf(err, "creating layer tar for buildpack '%s:%s'", bpd.Info.ID, bpd.Info.Version)
+	}
+
+	return &distBlob{
+		r: pr,
+	}, nil
+}
+
+func embedBuildpackTar2(tw *tar.Writer, uid, gid int, blob Blob, baseTarDir string) error {
+	var (
+		err error
+	)
+
+	rc, err := blob.Open()
+	if err != nil {
+		return errors.Wrap(err, "read buildpack blob")
+	}
+	defer rc.Close()
+
+	tr := tar.NewReader(rc)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return errors.Wrap(err, "failed to get next tar entry")
+		}
+
+		header.Name = path.Clean(header.Name)
+		if header.Name == "." || header.Name == "/" {
+			continue
+		}
+
+		header.Name = path.Clean(path.Join(baseTarDir, header.Name))
+		header.Uid = uid
+		header.Gid = gid
+		err = tw.WriteHeader(header)
+		if err != nil {
+			return errors.Wrapf(err, "failed to write header for '%s'", header.Name)
+		}
+
+		buf, err := ioutil.ReadAll(tr)
+		if err != nil {
+			return errors.Wrapf(err, "failed to read contents of '%s'", header.Name)
+		}
+
+		_, err = tw.Write(buf)
+		if err != nil {
+			return errors.Wrapf(err, "failed to write contents to '%s'", header.Name)
+		}
+	}
+
+	return nil
 }
 
 func validateDescriptor(bpd BuildpackDescriptor) error {
