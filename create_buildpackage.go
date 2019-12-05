@@ -2,7 +2,6 @@ package pack
 
 import (
 	"context"
-	"io"
 
 	"github.com/buildpack/imgutil"
 	"github.com/pkg/errors"
@@ -28,7 +27,7 @@ func (c *Client) CreatePackage(ctx context.Context, opts CreatePackageOptions) e
 			return errors.Wrapf(err, "downloading buildpack from %s", style.Symbol(bc.URI))
 		}
 
-		bp, err := dist.NewBuildpack(blob)
+		bp, err := dist.BuildpackFromRootBlob(blob)
 		if err != nil {
 			return errors.Wrapf(err, "creating buildpack from %s", style.Symbol(bc.URI))
 		}
@@ -119,12 +118,15 @@ func (i *packageImage) Buildpacks() ([]dist.Buildpack, error) {
 				Stacks: bpInfo.Stacks,
 				Order:  bpInfo.Order,
 			}
-			bps = append(bps, dist.BuildpackImpl{
-				Blob: nil,
-			})
+			
+			// FIXME: Handle closing safely
+			rc, err := i.img.GetLayer(bpInfo.LayerDiffID)
+			if err != nil {
+				return nil, errors.Wrapf(err, "extracting buildpack %s layer (diffID %s) from package %s", style.Symbol(desc.Info.FullName()), style.Symbol(bpInfo.LayerDiffID), style.Symbol(i.Name()))
+			}
+			
+			bps = append(bps, dist.BuildpackFromTarReadCloser(desc, rc))
 		}
 	}
-
-	// TODO: REMOVE
 	return bps, nil
 }

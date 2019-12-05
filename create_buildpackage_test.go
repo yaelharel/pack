@@ -113,7 +113,7 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 		}
 
 		when("publish=false and no-pull=false", func() {
-			it("should pull and use local image", func() {
+			it.Focus("should pull and use local image", func() {
 				shouldCallImageFetcherWith(true, true)
 				localImage := shouldCreateLocalImage()
 				h.AssertNil(t, subject.CreatePackage(context.TODO(), pack.CreatePackageOptions{

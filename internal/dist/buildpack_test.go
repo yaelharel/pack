@@ -34,7 +34,7 @@ func testBuildpack(t *testing.T, when spec.G, it spec.S) {
 		h.AssertNil(t, os.RemoveAll(tmpBpDir))
 	})
 
-	when("#NewBuildpack", func() {
+	when("#BuildpackFromRootBlob", func() {
 		it("makes a buildpack from a blob", func() {
 			h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "buildpack.toml"), []byte(`
 api = "0.3"
@@ -47,7 +47,7 @@ version = "1.2.3"
 id = "some.stack.id"
 `), os.ModePerm))
 
-			bp, err := dist.NewBuildpack(blob.NewBlob(tmpBpDir))
+			bp, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
 			h.AssertNil(t, err)
 			h.AssertEq(t, bp.Descriptor().API.String(), "0.3")
 			h.AssertEq(t, bp.Descriptor().Info.ID, "bp.one")
@@ -57,7 +57,7 @@ id = "some.stack.id"
 
 		when("there is no descriptor file", func() {
 			it("returns error", func() {
-				_, err := dist.NewBuildpack(blob.NewBlob(tmpBpDir))
+				_, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
 				h.AssertError(t, err, "could not find entry path 'buildpack.toml'")
 			})
 		})
@@ -75,7 +75,7 @@ id = "some.stack.id"
 			})
 
 			it("assumes an api version", func() {
-				bp, err := dist.NewBuildpack(blob.NewBlob(tmpBpDir))
+				bp, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
 				h.AssertNil(t, err)
 				h.AssertEq(t, bp.Descriptor().API.String(), "0.1")
 			})
@@ -94,7 +94,7 @@ id = "some.stack.id"
 			})
 
 			it("returns error", func() {
-				_, err := dist.NewBuildpack(blob.NewBlob(tmpBpDir))
+				_, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
 				h.AssertError(t, err, "'buildpack.id' is required")
 			})
 		})
@@ -112,7 +112,7 @@ id = "some.stack.id"
 			})
 
 			it("returns error", func() {
-				_, err := dist.NewBuildpack(blob.NewBlob(tmpBpDir))
+				_, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
 				h.AssertError(t, err, "'buildpack.version' is required")
 			})
 		})
@@ -135,7 +135,7 @@ id = "some.stack.id"
 			})
 
 			it("returns error", func() {
-				_, err := dist.NewBuildpack(blob.NewBlob(tmpBpDir))
+				_, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
 				h.AssertError(t, err, "cannot have both 'stacks' and an 'order' defined")
 			})
 		})
@@ -150,7 +150,7 @@ version = "1.2.3"
 			})
 
 			it("returns error", func() {
-				_, err := dist.NewBuildpack(blob.NewBlob(tmpBpDir))
+				_, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
 				h.AssertError(t, err, "must have either 'stacks' or an 'order' defined")
 			})
 		})

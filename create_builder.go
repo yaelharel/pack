@@ -72,7 +72,7 @@ func (c *Client) CreateBuilder(ctx context.Context, opts CreateBuilderOptions) e
 			return errors.Wrapf(err, "downloading buildpack from %s", style.Symbol(b.URI))
 		}
 
-		fetchedBp, err := dist.NewBuildpack(blob)
+		fetchedBp, err := dist.BuildpackFromRootBlob(blob)
 		if err != nil {
 			return errors.Wrapf(err, "creating buildpack from %s", style.Symbol(b.URI))
 		}
