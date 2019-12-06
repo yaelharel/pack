@@ -1056,7 +1056,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 		})
 	})
 
-	when("create-package", func() {
+	when.Focus("create-package", func() {
 		var tmpDir string
 
 		it.Before(func() {
@@ -1121,7 +1121,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 			return packageTomlFile.Name()
 		}
 
-		it.Focus("creates the package", func() {
+		it("creates the package", func() {
 			t.Log("package w/ only buildpacks")
 			nestedPackageName := createPackageLocally(filepath.Join(tmpDir, "package.toml"))
 

@@ -58,7 +58,7 @@ type Stack struct {
 // BuildpackFromRootBlob constructs a buildpack from a blob. It is assumed that the buildpack contents reside at the root of the
 // blob. The constructed buildpack contents will be structured as per the distribution spec (currently
 // '/cnbs/buildpacks/{ID}/{version}/*').
-func BuildpackFromRootBlob(blob Blob) (*buildpack, error) {
+func BuildpackFromRootBlob(blob Blob) (Buildpack, error) {
 	bpd := BuildpackDescriptor{}
 	rc, err := blob.Open()
 	if err != nil {
@@ -81,18 +81,18 @@ func BuildpackFromRootBlob(blob Blob) (*buildpack, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid buildpack.toml")
 	}
-	
+
 	db, err := toDistBlob(bpd, blob)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating distribution blob")
 	}
-	
+
 	return &buildpack{descriptor: bpd, Blob: db}, nil
 }
 
 // BuildpackFromTarReadCloser constructs a buildpack from a ReadCloser to a tar. It is assumed that the buildpack
 // contents are structured as per the distribution spec (currently '/cnbs/buildpacks/{ID}/{version}/*').
-func BuildpackFromTarReadCloser(bpd BuildpackDescriptor, rc io.ReadCloser) *buildpack {
+func BuildpackFromTarReadCloser(bpd BuildpackDescriptor, rc io.ReadCloser) Buildpack {
 	return &buildpack{
 		Blob: &distBlob{
 			rc: rc,
@@ -109,18 +109,13 @@ func (b *distBlob) Open() (io.ReadCloser, error) {
 	return b.rc, nil
 }
 
-// main thread        coroutine
-// r* <--------------- w*
-// [r  w]-->tw <- 
 func toDistBlob(bpd BuildpackDescriptor, blob Blob) (Blob, error) {
 	pr, pw := io.Pipe()
-	
 	tw := tar.NewWriter(pw)
-	defer tw.Close()
-
 	ts := archive.NormalizedDateTime
 
 	go func() {
+		defer tw.Close()
 		if err := tw.WriteHeader(&tar.Header{
 			Typeflag: tar.TypeDir,
 			Name:     path.Join(BuildpacksDir, bpd.EscapedID()),
@@ -130,7 +125,7 @@ func toDistBlob(bpd BuildpackDescriptor, blob Blob) (Blob, error) {
 			// return nil, err
 			panic("fooooooo!")
 		}
-	
+
 		baseTarDir := path.Join(BuildpacksDir, bpd.EscapedID(), bpd.Info.Version)
 		if err := tw.WriteHeader(&tar.Header{
 			Typeflag: tar.TypeDir,
@@ -141,7 +136,7 @@ func toDistBlob(bpd BuildpackDescriptor, blob Blob) (Blob, error) {
 			// return nil, err
 			panic("fooooooo!!!!!!11111")
 		}
-	
+
 		if err := writeTar(tw, blob, baseTarDir); err != nil {
 			// return nil, errors.Wrapf(err, "creating layer tar for buildpack '%s:%s'", bpd.Info.ID, bpd.Info.Version)
 			panic("fooooooo!!!!!!11111222222345trrt")

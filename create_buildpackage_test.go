@@ -61,7 +61,7 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	createBuildpack := func(descriptor dist.BuildpackDescriptor) string {
-		bp, err := ifakes.NewBuildpackFromDescriptor(descriptor, 0644)
+		bp, err := ifakes.NewBuildpackFromDescriptor(descriptor, 0644, true)
 		h.AssertNil(t, err)
 		url := fmt.Sprintf("https://example.com/bp.%s.tgz", h.RandString(12))
 		mockDownloader.EXPECT().Download(gomock.Any(), url).Return(bp, nil).AnyTimes()
@@ -113,7 +113,7 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 		}
 
 		when("publish=false and no-pull=false", func() {
-			it.Focus("should pull and use local image", func() {
+			it("should pull and use local image", func() {
 				shouldCallImageFetcherWith(true, true)
 				localImage := shouldCreateLocalImage()
 				h.AssertNil(t, subject.CreatePackage(context.TODO(), pack.CreatePackageOptions{

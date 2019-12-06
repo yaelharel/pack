@@ -23,6 +23,7 @@ const BuildpacksDir = "/cnb/buildpacks"
 // layer tar = {ID}.{V}.tar
 //
 // inside the layer = /cnbs/buildpacks/{ID}/{V}/*
+// Deprecated
 func BuildpackLayer(dest string, uid, gid int, bp Buildpack) (string, error) {
 	bpd := bp.Descriptor()
 	layerTar := filepath.Join(dest, fmt.Sprintf("%s.%s.tar", bpd.EscapedID(), bpd.Info.Version))
@@ -64,7 +65,7 @@ func BuildpackLayer(dest string, uid, gid int, bp Buildpack) (string, error) {
 	return layerTar, nil
 }
 
-func BuildpackLayer2(dest string, uid, gid int, bp Buildpack) (string, error) {
+func BuildpackToLayerTar(dest string, bp Buildpack) (string, error) {
 	bpd := bp.Descriptor()
 	layerTar := filepath.Join(dest, fmt.Sprintf("%s.%s.tar", bpd.EscapedID(), bpd.Info.Version))
 
@@ -76,8 +77,8 @@ func BuildpackLayer2(dest string, uid, gid int, bp Buildpack) (string, error) {
 
 	tw := tar.NewWriter(fh)
 	defer tw.Close()
-	
-	if err := embedBuildpackTar2(tw, uid, gid, bp); err != nil {
+
+	if err := embedBuildpackTar2(tw, bp); err != nil {
 		return "", errors.Wrapf(err, "creating layer tar for buildpack '%s:%s'", bpd.Info.ID, bpd.Info.Version)
 	}
 
@@ -132,7 +133,7 @@ func embedBuildpackTar(tw *tar.Writer, uid, gid int, bp Buildpack, baseTarDir st
 	return nil
 }
 
-func embedBuildpackTar2(tw *tar.Writer, uid, gid int, bp Buildpack) error {
+func embedBuildpackTar2(tw *tar.Writer, bp Buildpack) error {
 	var (
 		err error
 	)
@@ -153,8 +154,8 @@ func embedBuildpackTar2(tw *tar.Writer, uid, gid int, bp Buildpack) error {
 			return errors.Wrap(err, "failed to get next tar entry")
 		}
 
-		header.Uid = uid
-		header.Gid = gid
+		header.Uid = 0
+		header.Gid = 0
 		err = tw.WriteHeader(header)
 		if err != nil {
 			return errors.Wrapf(err, "failed to write header for '%s'", header.Name)

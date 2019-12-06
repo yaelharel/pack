@@ -93,18 +93,11 @@ func (i *packageImage) Name() string {
 	return i.img.Name()
 }
 
-// func (i *packageImage) BuildpackLayers() dist.BuildpackLayers {
-// 	return i.bpLayers
-// }
-
-// func (i *packageImage) GetLayer(diffID string) (io.ReadCloser, error) {
-// 	return i.img.GetLayer(diffID)
-// }
-
 func (i *packageImage) Label(name string) (value string, err error) {
 	return i.img.Label(name)
 }
 
+// TODO: test this
 func (i *packageImage) Buildpacks() ([]dist.Buildpack, error) {
 	var bps []dist.Buildpack
 	for bpID, v := range i.bpLayers {
@@ -118,13 +111,13 @@ func (i *packageImage) Buildpacks() ([]dist.Buildpack, error) {
 				Stacks: bpInfo.Stacks,
 				Order:  bpInfo.Order,
 			}
-			
+
 			// FIXME: Handle closing safely
 			rc, err := i.img.GetLayer(bpInfo.LayerDiffID)
 			if err != nil {
 				return nil, errors.Wrapf(err, "extracting buildpack %s layer (diffID %s) from package %s", style.Symbol(desc.Info.FullName()), style.Symbol(bpInfo.LayerDiffID), style.Symbol(i.Name()))
 			}
-			
+
 			bps = append(bps, dist.BuildpackFromTarReadCloser(desc, rc))
 		}
 	}
