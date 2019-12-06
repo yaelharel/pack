@@ -13,24 +13,11 @@ import (
 )
 
 type fakeBuildpack struct {
-	descriptor     dist.BuildpackDescriptor
-	chmod          int64
-	contentsAtRoot bool
+	descriptor dist.BuildpackDescriptor
+	chmod      int64
 }
 
-// NewBuildpackFromDescriptor creates a fake buildpacks for testing purposes where tar contents are such:
-//
-// contentsAtRoot == true:
-//
-// 	\_ buildpack.toml
-// 	\_ bin
-// 	\_ bin/build
-//  	build-contents
-// 	\_ bin/detect
-//  	detect-contents
-//
-//
-// contentsAtRoot == false:
+// NewFakeBuildpack creates a fake buildpacks with contents:
 //
 // 	\_ /cnbs/buildpacks/{ID}
 // 	\_ /cnbs/buildpacks/{ID}/{version}
@@ -40,12 +27,10 @@ type fakeBuildpack struct {
 //  	build-contents
 // 	\_ /cnbs/buildpacks/{ID}/{version}/bin/detect
 //  	detect-contents
-//
-func NewBuildpackFromDescriptor(descriptor dist.BuildpackDescriptor, chmod int64, contentsAtRoot bool) (dist.Buildpack, error) {
+func NewFakeBuildpack(descriptor dist.BuildpackDescriptor, chmod int64) (dist.Buildpack, error) {
 	return &fakeBuildpack{
-		descriptor:     descriptor,
-		chmod:          chmod,
-		contentsAtRoot: contentsAtRoot,
+		descriptor: descriptor,
+		chmod:      chmod,
 	}, nil
 }
 
@@ -60,21 +45,13 @@ func (b *fakeBuildpack) Open() (reader io.ReadCloser, err error) {
 	}
 
 	tarBuilder := archive.TarBuilder{}
-
-	if b.contentsAtRoot {
-		tarBuilder.AddFile("buildpack.toml", b.chmod, time.Now(), buf.Bytes())
-		tarBuilder.AddDir("bin", b.chmod, time.Now())
-		tarBuilder.AddFile("bin/build", b.chmod, time.Now(), []byte("build-contents"))
-		tarBuilder.AddFile("bin/detect", b.chmod, time.Now(), []byte("detect-contents"))
-	} else {
-		tarBuilder.AddDir(fmt.Sprintf("/cnb/buildpacks/%s", b.descriptor.EscapedID()), b.chmod, time.Now())
-		bpDir := fmt.Sprintf("/cnb/buildpacks/%s/%s", b.descriptor.EscapedID(), b.descriptor.Info.Version)
-		tarBuilder.AddDir(bpDir, b.chmod, time.Now())
-		tarBuilder.AddFile(bpDir+"/buildpack.toml", b.chmod, time.Now(), buf.Bytes())
-		tarBuilder.AddDir(bpDir+"/bin", b.chmod, time.Now())
-		tarBuilder.AddFile(bpDir+"/bin/build", b.chmod, time.Now(), []byte("build-contents"))
-		tarBuilder.AddFile(bpDir+"/bin/detect", b.chmod, time.Now(), []byte("detect-contents"))
-	}
+	tarBuilder.AddDir(fmt.Sprintf("/cnb/buildpacks/%s", b.descriptor.EscapedID()), b.chmod, time.Now())
+	bpDir := fmt.Sprintf("/cnb/buildpacks/%s/%s", b.descriptor.EscapedID(), b.descriptor.Info.Version)
+	tarBuilder.AddDir(bpDir, b.chmod, time.Now())
+	tarBuilder.AddFile(bpDir+"/buildpack.toml", b.chmod, time.Now(), buf.Bytes())
+	tarBuilder.AddDir(bpDir+"/bin", b.chmod, time.Now())
+	tarBuilder.AddFile(bpDir+"/bin/build", b.chmod, time.Now(), []byte("build-contents"))
+	tarBuilder.AddFile(bpDir+"/bin/detect", b.chmod, time.Now(), []byte("detect-contents"))
 
 	return tarBuilder.Reader(), err
 }

@@ -122,6 +122,7 @@ func toDistBlob(bpd BuildpackDescriptor, blob Blob) (Blob, error) {
 			Mode:     0755,
 			ModTime:  ts,
 		}); err != nil {
+			// FIXME: handle errors
 			// return nil, err
 			panic("fooooooo!")
 		}
@@ -134,6 +135,7 @@ func toDistBlob(bpd BuildpackDescriptor, blob Blob) (Blob, error) {
 			ModTime:  ts,
 		}); err != nil {
 			// return nil, err
+			// FIXME: handle errors
 			panic("fooooooo!!!!!!11111")
 		}
 

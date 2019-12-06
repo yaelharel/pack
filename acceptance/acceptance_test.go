@@ -1056,7 +1056,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 		})
 	})
 
-	when.Focus("create-package", func() {
+	when("create-package", func() {
 		var tmpDir string
 
 		it.Before(func() {

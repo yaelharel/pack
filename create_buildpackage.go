@@ -35,38 +35,9 @@ func (c *Client) CreatePackage(ctx context.Context, opts CreatePackageOptions) e
 		packageBuilder.AddBuildpack(bp)
 	}
 
-	for _, ref := range opts.Config.Packages {
-		pkgImage, err := c.imageFetcher.Fetch(ctx, ref.Ref, !opts.Publish, !opts.NoPull)
-		if err != nil {
-			return errors.Wrapf(err, "fetching image %s", style.Symbol(ref.Ref))
-		}
-
-		bpLayers := dist.BuildpackLayers{}
-		ok, err := dist.GetLabel(pkgImage, dist.BuildpackLayersLabel, &bpLayers)
-		if err != nil {
+	for _, pkg := range opts.Config.Packages {
+		if err := ingestPackage(ctx, pkg.Ref, packageBuilder, c.imageFetcher, opts.Publish, opts.NoPull); err != nil {
 			return err
-		}
-
-		if !ok {
-			return errors.Errorf(
-				"label %s not present on package %s",
-				style.Symbol(dist.BuildpackLayersLabel),
-				style.Symbol(ref.Ref),
-			)
-		}
-
-		pkg := &packageImage{
-			img:      pkgImage,
-			bpLayers: bpLayers,
-		}
-
-		bps, err := pkg.Buildpacks()
-		if err != nil {
-			return errors.Wrap(err, "extracting package buildpacks")
-		}
-
-		for _, bp := range bps {
-			packageBuilder.AddBuildpack(bp)
 		}
 	}
 
@@ -82,6 +53,46 @@ func (c *Client) CreatePackage(ctx context.Context, opts CreatePackageOptions) e
 	}
 
 	return err
+}
+
+type buildpackIngester interface {
+	AddBuildpack(buildpack dist.Buildpack)
+}
+
+func ingestPackage(ctx context.Context, imageRef string, ingester buildpackIngester, fetcher ImageFetcher, publish, noPull bool) error {
+	pkgImage, err := fetcher.Fetch(ctx, imageRef, !publish, !noPull)
+	if err != nil {
+		return errors.Wrapf(err, "fetching image %s", style.Symbol(imageRef))
+	}
+
+	bpLayers := dist.BuildpackLayers{}
+	ok, err := dist.GetLabel(pkgImage, dist.BuildpackLayersLabel, &bpLayers)
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		return errors.Errorf(
+			"label %s not present on package %s",
+			style.Symbol(dist.BuildpackLayersLabel),
+			style.Symbol(imageRef),
+		)
+	}
+
+	pkg := &packageImage{
+		img:      pkgImage,
+		bpLayers: bpLayers,
+	}
+
+	bps, err := pkg.Buildpacks()
+	if err != nil {
+		return errors.Wrap(err, "extracting package buildpacks")
+	}
+
+	for _, bp := range bps {
+		ingester.AddBuildpack(bp)
+	}
+	return nil
 }
 
 type packageImage struct {

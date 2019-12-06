@@ -61,7 +61,7 @@ func testCreatePackage(t *testing.T, when spec.G, it spec.S) {
 	})
 
 	createBuildpack := func(descriptor dist.BuildpackDescriptor) string {
-		bp, err := ifakes.NewBuildpackFromDescriptor(descriptor, 0644, true)
+		bp, err := ifakes.NewFakeBuildpackBlob(descriptor, 0644)
 		h.AssertNil(t, err)
 		url := fmt.Sprintf("https://example.com/bp.%s.tgz", h.RandString(12))
 		mockDownloader.EXPECT().Download(gomock.Any(), url).Return(bp, nil).AnyTimes()

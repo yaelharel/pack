@@ -71,7 +71,7 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 
 		when("validate stacks", func() {
 			it.Before(func() {
-				buildpack, err := ifakes.NewBuildpackFromDescriptor(dist.BuildpackDescriptor{
+				buildpack, err := ifakes.NewFakeBuildpack(dist.BuildpackDescriptor{
 					API: api.MustParse("0.2"),
 					Info: dist.BuildpackInfo{
 						ID:      "bp.1.id",
@@ -81,7 +81,7 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 						{ID: "stack.id.1", Mixins: []string{"Mixin-A"}},
 					},
 					Order: nil,
-				}, 0644, false)
+				}, 0644)
 				h.AssertNil(t, err)
 
 				subject.SetDefaultBuildpack(dist.BuildpackInfo{
@@ -134,7 +134,7 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 
 			when("bp has more supported stacks than package supports", func() {
 				it("should be successful", func() {
-					buildpack2, err := ifakes.NewBuildpackFromDescriptor(dist.BuildpackDescriptor{
+					buildpack2, err := ifakes.NewFakeBuildpack(dist.BuildpackDescriptor{
 						API: api.MustParse("0.2"),
 						Info: dist.BuildpackInfo{
 							ID:      "buildpack.2.id",
@@ -145,7 +145,7 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 							{ID: "stack.id.2"},
 						},
 						Order: nil,
-					}, 0644, false)
+					}, 0644)
 					h.AssertNil(t, err)
 
 					subject.AddBuildpack(buildpack2)
@@ -158,7 +158,7 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("sets metadata", func() {
-			buildpack1, err := ifakes.NewBuildpackFromDescriptor(dist.BuildpackDescriptor{
+			buildpack1, err := ifakes.NewFakeBuildpack(dist.BuildpackDescriptor{
 				API: api.MustParse("0.2"),
 				Info: dist.BuildpackInfo{
 					ID:      "bp.1.id",
@@ -169,7 +169,7 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 					{ID: "stack.id.2"},
 				},
 				Order: nil,
-			}, 0644, false)
+			}, 0644)
 			h.AssertNil(t, err)
 
 			subject.AddBuildpack(buildpack1)
@@ -194,12 +194,12 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("sets buildpack layers label", func() {
-			buildpack1, err := ifakes.NewBuildpackFromDescriptor(dist.BuildpackDescriptor{
+			buildpack1, err := ifakes.NewFakeBuildpack(dist.BuildpackDescriptor{
 				API:    api.MustParse("0.2"),
 				Info:   dist.BuildpackInfo{ID: "bp.1.id", Version: "bp.1.version"},
 				Stacks: []dist.Stack{{ID: "stack.id.1"}, {ID: "stack.id.2"}},
 				Order:  nil,
-			}, 0644, false)
+			}, 0644)
 			h.AssertNil(t, err)
 			subject.AddBuildpack(buildpack1)
 			subject.SetDefaultBuildpack(dist.BuildpackInfo{ID: "bp.1.id", Version: "bp.1.version"})
@@ -218,12 +218,12 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		it("adds buildpack layers", func() {
-			buildpack1, err := ifakes.NewBuildpackFromDescriptor(dist.BuildpackDescriptor{
+			buildpack1, err := ifakes.NewFakeBuildpack(dist.BuildpackDescriptor{
 				API:    api.MustParse("0.2"),
 				Info:   dist.BuildpackInfo{ID: "bp.1.id", Version: "bp.1.version"},
 				Stacks: []dist.Stack{{ID: "stack.id.1"}, {ID: "stack.id.2"}},
 				Order:  nil,
-			}, 0644, false)
+			}, 0644)
 			h.AssertNil(t, err)
 			subject.AddBuildpack(buildpack1)
 			subject.SetDefaultBuildpack(dist.BuildpackInfo{ID: "bp.1.id", Version: "bp.1.version"})
