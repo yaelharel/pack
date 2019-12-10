@@ -36,7 +36,7 @@ func (c *Client) CreatePackage(ctx context.Context, opts CreatePackageOptions) e
 	}
 
 	for _, pkg := range opts.Config.Packages {
-		if err := ingestPackage(ctx, pkg.Ref, packageBuilder, c.imageFetcher, opts.Publish, opts.NoPull); err != nil {
+		if err := addPackageBuildpacks(ctx, pkg.Ref, packageBuilder, c.imageFetcher, opts.Publish, opts.NoPull); err != nil {
 			return err
 		}
 	}
@@ -55,14 +55,15 @@ func (c *Client) CreatePackage(ctx context.Context, opts CreatePackageOptions) e
 	return err
 }
 
-type buildpackIngester interface {
+type buildpackAdder interface {
 	AddBuildpack(buildpack dist.Buildpack)
 }
 
-func ingestPackage(ctx context.Context, imageRef string, ingester buildpackIngester, fetcher ImageFetcher, publish, noPull bool) error {
-	pkgImage, err := fetcher.Fetch(ctx, imageRef, !publish, !noPull)
+// TODO: move to a more common location
+func addPackageBuildpacks(ctx context.Context, pkgImageRef string, adder buildpackAdder, fetcher ImageFetcher, publish, noPull bool) error {
+	pkgImage, err := fetcher.Fetch(ctx, pkgImageRef, !publish, !noPull)
 	if err != nil {
-		return errors.Wrapf(err, "fetching image %s", style.Symbol(imageRef))
+		return errors.Wrapf(err, "fetching image %s", style.Symbol(pkgImageRef))
 	}
 
 	bpLayers := dist.BuildpackLayers{}
@@ -75,7 +76,7 @@ func ingestPackage(ctx context.Context, imageRef string, ingester buildpackInges
 		return errors.Errorf(
 			"label %s not present on package %s",
 			style.Symbol(dist.BuildpackLayersLabel),
-			style.Symbol(imageRef),
+			style.Symbol(pkgImageRef),
 		)
 	}
 
@@ -90,7 +91,7 @@ func ingestPackage(ctx context.Context, imageRef string, ingester buildpackInges
 	}
 
 	for _, bp := range bps {
-		ingester.AddBuildpack(bp)
+		adder.AddBuildpack(bp)
 	}
 	return nil
 }

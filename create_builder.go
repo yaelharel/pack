@@ -85,12 +85,11 @@ func (c *Client) CreateBuilder(ctx context.Context, opts CreateBuilderOptions) e
 		bldr.AddBuildpack(fetchedBp)
 	}
 
-	// TODO: test this
-	// for _, pkg := range opts.Config.Packages {
-	// 	if err := ingestPackage(ctx, pkg.Ref, bldr, c.imageFetcher, opts.Publish, opts.NoPull); err != nil {
-	// 		return err
-	// 	}
-	// }
+	for _, pkg := range opts.Config.Packages {
+		if err := addPackageBuildpacks(ctx, pkg.Ref, bldr, c.imageFetcher, opts.Publish, opts.NoPull); err != nil {
+			return err
+		}
+	}
 
 	bldr.SetOrder(opts.Config.Order)
 	bldr.SetStack(opts.Config.Stack)

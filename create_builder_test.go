@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/buildpack/imgutil"
 	"github.com/buildpack/imgutil/fakes"
 	"github.com/golang/mock/gomock"
 	"github.com/heroku/color"
@@ -76,7 +75,7 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 
 			fakeRunImageMirror = fakes.NewImage("localhost:5000/some/run-image", "", nil)
 			h.AssertNil(t, fakeRunImageMirror.SetLabel("io.buildpacks.stack.id", "some.stack.id"))
-			
+
 			mockDownloader.EXPECT().Download(gomock.Any(), "https://example.fake/bp-one.tgz").Return(blob.NewBlob(filepath.Join("testdata", "buildpack")), nil).AnyTimes()
 			mockDownloader.EXPECT().Download(gomock.Any(), "some/buildpack/dir").Return(blob.NewBlob(filepath.Join("testdata", "buildpack")), nil).AnyTimes()
 			mockDownloader.EXPECT().Download(gomock.Any(), "file:///some-lifecycle").Return(blob.NewBlob(filepath.Join("testdata", "lifecycle")), nil).AnyTimes()
@@ -128,12 +127,12 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		var prepareFetcherWithRunImages = func() {
-			mockImageFetcher.EXPECT().Fetch(gomock.Any(), "some/run-image", true, gomock.Any()).Return(fakeRunImage, nil).AnyTimes()
-			mockImageFetcher.EXPECT().Fetch(gomock.Any(), "localhost:5000/some/run-image", true, gomock.Any()).Return(fakeRunImageMirror, nil).AnyTimes()
+			mockImageFetcher.EXPECT().Fetch(gomock.Any(), "some/run-image", gomock.Any(), gomock.Any()).Return(fakeRunImage, nil).AnyTimes()
+			mockImageFetcher.EXPECT().Fetch(gomock.Any(), "localhost:5000/some/run-image", gomock.Any(), gomock.Any()).Return(fakeRunImageMirror, nil).AnyTimes()
 		}
 
 		var prepareFetcherWithBuildImage = func() {
-			mockImageFetcher.EXPECT().Fetch(gomock.Any(), "some/build-image", true, gomock.Any()).Return(fakeBuildImage, nil).AnyTimes()
+			mockImageFetcher.EXPECT().Fetch(gomock.Any(), "some/build-image", gomock.Any(), gomock.Any()).Return(fakeBuildImage, nil)
 		}
 
 		var configureBuilderWithLifecycleAPIv0_1 = func() {
@@ -493,20 +492,20 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 			}
 
 			when("package image lives in registry", func() {
-				var nestedPackage *fakes.Image
+				var packageImage *fakes.Image
 
 				it.Before(func() {
-					nestedPackage = fakes.NewImage("nested/package-"+h.RandString(12), "", nil)
-					mockImageFactory.EXPECT().NewImage(nestedPackage.Name(), false).Return(nestedPackage, nil)
+					packageImage = fakes.NewImage("some/package-"+h.RandString(12), "", nil)
+					mockImageFactory.EXPECT().NewImage(packageImage.Name(), false).Return(packageImage, nil)
 
 					bpd := dist.BuildpackDescriptor{
-						API:    api.MustParse("0.2"),
-						Info:   dist.BuildpackInfo{ID: "bp.nested", Version: "2.3.4"},
+						API:    api.MustParse("0.3"),
+						Info:   dist.BuildpackInfo{ID: "some.pkg.bp", Version: "2.3.4"},
 						Stacks: []dist.Stack{{ID: "some.stack.id"}},
 					}
 
 					h.AssertNil(t, subject.CreatePackage(context.TODO(), pack.CreatePackageOptions{
-						Name: nestedPackage.Name(),
+						Name: packageImage.Name(),
 						Config: buildpackage.Config{
 							Default:    bpd.Info,
 							Buildpacks: []dist.BuildpackURI{{URI: createBuildpack(bpd)}},
@@ -516,112 +515,87 @@ func testCreateBuilder(t *testing.T, when spec.G, it spec.S) {
 					}))
 				})
 
-				shouldCallImageFetcherWith := func(demon, pull bool) {
-					mockImageFetcher.EXPECT().Fetch(gomock.Any(), nestedPackage.Name(), demon, pull).Return(nestedPackage, nil)
+				shouldFetchPackageImageWith := func(demon, pull bool) {
+					mockImageFetcher.EXPECT().Fetch(gomock.Any(), packageImage.Name(), demon, pull).Return(packageImage, nil)
 				}
 
-				shouldNotFindImageWhenCallingImageFetcherWith := func(demon, pull bool) {
-					mockImageFetcher.EXPECT().Fetch(gomock.Any(), nestedPackage.Name(), demon, pull).Return(nil, image.ErrNotFound)
-				}
-
-				shouldCreateLocalImage := func() imgutil.Image {
-					img := fakes.NewImage("some/package"+h.RandString(12), "", nil)
-					mockImageFactory.EXPECT().NewImage(img.Name(), true).Return(img, nil)
-					return img
-				}
-
-				shouldCreateRemoteImage := func() *fakes.Image {
-					img := fakes.NewImage("some/package"+h.RandString(12), "", nil)
-					mockImageFactory.EXPECT().NewImage(img.Name(), false).Return(img, nil)
-					return img
+				prepareFetcherWithMissingPackageImage := func() {
+					mockImageFetcher.EXPECT().Fetch(gomock.Any(), packageImage.Name(), gomock.Any(), gomock.Any()).Return(nil, image.ErrNotFound)
 				}
 
 				when("publish=false and no-pull=false", func() {
-					it("should pull and use local image", func() {
-						shouldCallImageFetcherWith(true, true)
-						localImage := shouldCreateLocalImage()
-						h.AssertNil(t, subject.CreatePackage(context.TODO(), pack.CreatePackageOptions{
-							Name: localImage.Name(),
-							Config: buildpackage.Config{
-								Default:  dist.BuildpackInfo{ID: "bp.nested", Version: "2.3.4"},
-								Packages: []dist.ImageRef{{Ref: nestedPackage.Name()}},
-								Stacks:   []dist.Stack{{ID: "some.stack.id"}},
-							},
-							Publish: false,
-							NoPull:  false,
-						}))
+					it("should pull and use local package image", func() {
+						prepareFetcherWithBuildImage()
+						prepareFetcherWithRunImages()
+						opts.BuilderName = "some/builder"
+
+						opts.Publish = false
+						opts.NoPull = false
+						opts.Config.Packages = []pubbldr.PackageConfig{{Ref: packageImage.Name()}}
+
+						shouldFetchPackageImageWith(true, true)
+						h.AssertNil(t, subject.CreateBuilder(context.TODO(), opts))
 					})
 				})
 
 				when("publish=true and no-pull=false", func() {
-					it("should use remote image", func() {
-						shouldCallImageFetcherWith(false, true)
-						packageImage := shouldCreateRemoteImage()
+					it("should use remote package image", func() {
+						prepareFetcherWithBuildImage()
+						prepareFetcherWithRunImages()
+						opts.BuilderName = "some/builder"
 
-						h.AssertNil(t, subject.CreatePackage(context.TODO(), pack.CreatePackageOptions{
-							Name: packageImage.Name(),
-							Config: buildpackage.Config{
-								Default:  dist.BuildpackInfo{ID: "bp.nested", Version: "2.3.4"},
-								Packages: []dist.ImageRef{{Ref: nestedPackage.Name()}},
-								Stacks:   []dist.Stack{{ID: "some.stack.id"}},
-							},
-							Publish: true,
-							NoPull:  false,
-						}))
+						opts.Publish = true
+						opts.NoPull = false
+						opts.Config.Packages = []pubbldr.PackageConfig{{Ref: packageImage.Name()}}
+
+						shouldFetchPackageImageWith(false, true)
+						h.AssertNil(t, subject.CreateBuilder(context.TODO(), opts))
 					})
 				})
 
 				when("publish=true and no-pull=true", func() {
-					it("should not pull image and push to registry", func() {
-						shouldCallImageFetcherWith(false, false)
-						packageImage := shouldCreateRemoteImage()
+					it("should push to registry and not pull package image", func() {
+						prepareFetcherWithBuildImage()
+						prepareFetcherWithRunImages()
+						opts.BuilderName = "some/builder"
 
-						h.AssertNil(t, subject.CreatePackage(context.TODO(), pack.CreatePackageOptions{
-							Name: packageImage.Name(),
-							Config: buildpackage.Config{
-								Default:  dist.BuildpackInfo{ID: "bp.nested", Version: "2.3.4"},
-								Packages: []dist.ImageRef{{Ref: nestedPackage.Name()}},
-								Stacks:   []dist.Stack{{ID: "some.stack.id"}},
-							},
-							Publish: true,
-							NoPull:  true,
-						}))
+						opts.Publish = true
+						opts.NoPull = true
+						opts.Config.Packages = []pubbldr.PackageConfig{{Ref: packageImage.Name()}}
+
+						shouldFetchPackageImageWith(false, false)
+						h.AssertNil(t, subject.CreateBuilder(context.TODO(), opts))
 					})
 				})
 
-				when("publish=false no-pull=true and there is no local image", func() {
-					it("should fail without trying to retrieve image from registry", func() {
-						shouldNotFindImageWhenCallingImageFetcherWith(true, false)
+				when("publish=false no-pull=true and there is no local package image", func() {
+					it("should fail without trying to retrieve package image from registry", func() {
+						prepareFetcherWithBuildImage()
+						prepareFetcherWithRunImages()
+						opts.BuilderName = "some/builder"
 
-						h.AssertError(t, subject.CreatePackage(context.TODO(), pack.CreatePackageOptions{
-							Name: "some/package",
-							Config: buildpackage.Config{
-								Default:  dist.BuildpackInfo{ID: "bp.nested", Version: "2.3.4"},
-								Packages: []dist.ImageRef{{Ref: nestedPackage.Name()}},
-								Stacks:   []dist.Stack{{ID: "some.stack.id"}},
-							},
-							Publish: false,
-							NoPull:  true,
-						}), "not found")
+						opts.Publish = false
+						opts.NoPull = true
+						opts.Config.Packages = []pubbldr.PackageConfig{{Ref: packageImage.Name()}}
+						prepareFetcherWithMissingPackageImage()
+
+						h.AssertError(t, subject.CreateBuilder(context.TODO(), opts), "not found")
 					})
 				})
 			})
 
 			when("package image is not a valid package", func() {
 				it("should error", func() {
-					notPackageImage := fakes.NewImage("not/package", "", nil)
-					mockImageFetcher.EXPECT().Fetch(gomock.Any(), notPackageImage.Name(), true, true).Return(notPackageImage, nil)
+					prepareFetcherWithBuildImage()
+					prepareFetcherWithRunImages()
+					opts.BuilderName = "some/builder"
 
-					h.AssertError(t, subject.CreatePackage(context.TODO(), pack.CreatePackageOptions{
-						Name: "",
-						Config: buildpackage.Config{
-							Default:  dist.BuildpackInfo{ID: "bp.1.id", Version: "bp.1.version"},
-							Packages: []dist.ImageRef{{Ref: notPackageImage.Name()}},
-							Stacks:   []dist.Stack{{ID: "stack.1.id"}},
-						},
-						Publish: false,
-						NoPull:  false,
-					}), "label 'io.buildpacks.buildpack.layers' not present on package 'not/package'")
+					notPackageImage := fakes.NewImage("not/package", "", nil)
+					opts.Config.Packages = []pubbldr.PackageConfig{{Ref: notPackageImage.Name()}}
+					mockImageFetcher.EXPECT().Fetch(gomock.Any(), notPackageImage.Name(), gomock.Any(), gomock.Any()).Return(notPackageImage, nil)
+					h.AssertNil(t, notPackageImage.SetLabel("io.buildpacks.buildpack.layers", ""))
+
+					h.AssertError(t, subject.CreateBuilder(context.TODO(), opts), "label 'io.buildpacks.buildpack.layers' not present on package 'not/package'")
 				})
 			})
 		})
