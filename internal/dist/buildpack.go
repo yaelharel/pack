@@ -15,6 +15,7 @@ import (
 )
 
 const AssumedBuildpackAPIVersion = "0.1"
+const BuildpacksDir = "/cnb/buildpacks"
 
 type Blob interface {
 	Open() (io.ReadCloser, error)
@@ -33,7 +34,8 @@ func (b *buildpack) Descriptor() BuildpackDescriptor {
 //go:generate mockgen -package testmocks -destination testmocks/mock_buildpack.go github.com/buildpack/pack/internal/dist Buildpack
 type Buildpack interface {
 	// Open returns a reader with contents structured as per the distribution spec
-	// (currently '/cnbs/buildpacks/{ID}/{version}/*').
+	// (currently '/cnbs/buildpacks/{ID}/{version}/*', all entries with a zeroed-out
+	// timestamp and root UID/GID).
 	Open() (io.ReadCloser, error)
 	Descriptor() BuildpackDescriptor
 }
@@ -116,6 +118,8 @@ func toDistBlob(bpd BuildpackDescriptor, blob Blob) (Blob, error) {
 
 	go func() {
 		defer tw.Close()
+		defer pw.Close()
+
 		if err := tw.WriteHeader(&tar.Header{
 			Typeflag: tar.TypeDir,
 			Name:     path.Join(BuildpacksDir, bpd.EscapedID()),

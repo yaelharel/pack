@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/BurntSushi/toml"
 
@@ -38,20 +37,21 @@ func (b *fakeBuildpack) Descriptor() dist.BuildpackDescriptor {
 	return b.descriptor
 }
 
-func (b *fakeBuildpack) Open() (reader io.ReadCloser, err error) {
+func (b *fakeBuildpack) Open() (io.ReadCloser, error) {
 	buf := &bytes.Buffer{}
-	if err = toml.NewEncoder(buf).Encode(b.descriptor); err != nil {
+	if err := toml.NewEncoder(buf).Encode(b.descriptor); err != nil {
 		return nil, err
 	}
 
 	tarBuilder := archive.TarBuilder{}
-	tarBuilder.AddDir(fmt.Sprintf("/cnb/buildpacks/%s", b.descriptor.EscapedID()), b.chmod, time.Now())
+	ts := archive.NormalizedDateTime
+	tarBuilder.AddDir(fmt.Sprintf("/cnb/buildpacks/%s", b.descriptor.EscapedID()), b.chmod, ts)
 	bpDir := fmt.Sprintf("/cnb/buildpacks/%s/%s", b.descriptor.EscapedID(), b.descriptor.Info.Version)
-	tarBuilder.AddDir(bpDir, b.chmod, time.Now())
-	tarBuilder.AddFile(bpDir+"/buildpack.toml", b.chmod, time.Now(), buf.Bytes())
-	tarBuilder.AddDir(bpDir+"/bin", b.chmod, time.Now())
-	tarBuilder.AddFile(bpDir+"/bin/build", b.chmod, time.Now(), []byte("build-contents"))
-	tarBuilder.AddFile(bpDir+"/bin/detect", b.chmod, time.Now(), []byte("detect-contents"))
+	tarBuilder.AddDir(bpDir, b.chmod, ts)
+	tarBuilder.AddFile(bpDir+"/buildpack.toml", b.chmod, ts, buf.Bytes())
+	tarBuilder.AddDir(bpDir+"/bin", b.chmod, ts)
+	tarBuilder.AddFile(bpDir+"/bin/build", b.chmod, ts, []byte("build-contents"))
+	tarBuilder.AddFile(bpDir+"/bin/detect", b.chmod, ts, []byte("detect-contents"))
 
-	return tarBuilder.Reader(), err
+	return tarBuilder.Reader(), nil
 }

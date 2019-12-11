@@ -240,9 +240,9 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 					return createBuilder(t, runImageMirror, builderTomlPath, packCreateBuilderPath, lifecyclePath, lifecycleDescriptor), nil
 				})
 				h.AssertNil(t, err)
-				suiteManager.RegisterCleanUp("clean-"+key, func() error {
-					return h.DockerRmi(dockerCli, value)
-				})
+				// suiteManager.RegisterCleanUp("clean-"+key, func() error {
+				// 	return h.DockerRmi(dockerCli, value)
+				// })
 
 				builderName = value
 			})
@@ -272,7 +272,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 						h.Run(t, subjectPack("set-default-builder", builderName))
 					})
 
-					it("creates a runnable, rebuildable image on daemon from app dir", func() {
+					it.Focus("creates a runnable, rebuildable image on daemon from app dir", func() {
 						appPath := filepath.Join("testdata", "mock_app")
 						output := h.Run(t, subjectPack("build", repoName, "-p", appPath))
 						h.AssertContains(t, output, fmt.Sprintf("Successfully built image '%s'", repoName))
@@ -1458,7 +1458,7 @@ func createBuilder(t *testing.T, runImageMirror, builderTOMLPath, packPath, life
 	}
 
 	// NAME BUILDER
-	bldr := registryConfig.RepoName("some-org/" + h.RandString(10))
+	bldr := registryConfig.RepoName("test/builder-" + h.RandString(10))
 
 	// CREATE BUILDER
 	cmd := exec.Command(packPath, "create-builder", "--no-color", bldr, "-b", filepath.Join(tmpDir, "builder.toml"))

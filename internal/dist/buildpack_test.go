@@ -1,6 +1,8 @@
 package dist_test
 
 import (
+	"io"
+	// "io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -10,6 +12,8 @@ import (
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
 
+	"github.com/buildpack/pack/internal/archive"
+	// "github.com/buildpack/pack/internal/archive"
 	"github.com/buildpack/pack/internal/blob"
 	"github.com/buildpack/pack/internal/dist"
 	h "github.com/buildpack/pack/testhelpers"
@@ -34,8 +38,28 @@ func testBuildpack(t *testing.T, when spec.G, it spec.S) {
 		h.AssertNil(t, os.RemoveAll(tmpBpDir))
 	})
 
+	var writeBlobToFile = func(bp dist.Buildpack) string {
+		t.Helper()
+
+		bpReader, err := bp.Open()
+		h.AssertNil(t, err)
+		defer bpReader.Close()
+
+		tmpDir, err := ioutil.TempDir("", "")
+		h.AssertNil(t, err)
+
+		path := filepath.Join(tmpDir, "bp.tar")
+		bpWriter, err := os.Create(path)
+		h.AssertNil(t, err)
+
+		_, err = io.Copy(bpWriter, bpReader)
+		h.AssertNil(t, err)
+
+		return path
+	}
+
 	when("#BuildpackFromRootBlob", func() {
-		it("makes a buildpack from a blob", func() {
+		it("parses the descriptor file", func() {
 			h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "buildpack.toml"), []byte(`
 api = "0.3"
 
@@ -49,10 +73,68 @@ id = "some.stack.id"
 
 			bp, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
 			h.AssertNil(t, err)
+
 			h.AssertEq(t, bp.Descriptor().API.String(), "0.3")
 			h.AssertEq(t, bp.Descriptor().Info.ID, "bp.one")
 			h.AssertEq(t, bp.Descriptor().Info.Version, "1.2.3")
 			h.AssertEq(t, bp.Descriptor().Stacks[0].ID, "some.stack.id")
+		})
+
+		it("translates blob to distribution format", func() {
+			h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "buildpack.toml"), []byte(`
+api = "0.3"
+
+[buildpack]
+id = "bp.one"
+version = "1.2.3"
+
+[[stacks]]
+id = "some.stack.id"
+`), os.ModePerm))
+			h.AssertNil(t, os.MkdirAll(filepath.Join(tmpBpDir, "bin"), 0700))
+			h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "bin", "detect"), []byte("detect-contents"), 0700))
+			h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "bin", "build"), []byte("build-contents"), 0700))
+
+			bp, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
+			h.AssertNil(t, err)
+
+			tarPath := writeBlobToFile(bp)
+			defer os.Remove(tarPath)
+
+			h.AssertOnTarEntry(t, tarPath,
+				"/cnb/buildpacks/bp.one",
+				h.IsDirectory(),
+				h.HasFileMode(0755),
+				h.HasModTime(archive.NormalizedDateTime),
+			)
+
+			h.AssertOnTarEntry(t, tarPath,
+				"/cnb/buildpacks/bp.one/1.2.3",
+				h.IsDirectory(),
+				h.HasFileMode(0755),
+				h.HasModTime(archive.NormalizedDateTime),
+			)
+
+			h.AssertOnTarEntry(t, tarPath,
+				"/cnb/buildpacks/bp.one/1.2.3/bin",
+				h.IsDirectory(),
+				h.HasFileMode(0700),
+				h.HasModTime(archive.NormalizedDateTime),
+			)
+
+			h.AssertOnTarEntry(t, tarPath,
+				"/cnb/buildpacks/bp.one/1.2.3/bin/detect",
+				h.HasFileMode(0700),
+				h.HasModTime(archive.NormalizedDateTime),
+				h.ContentEquals("detect-contents"),
+			)
+
+			h.AssertOnTarEntry(t, tarPath,
+				"/cnb/buildpacks/bp.one/1.2.3/bin/build",
+				h.HasFileMode(0700),
+				h.HasModTime(archive.NormalizedDateTime),
+				h.ContentEquals("build-contents"),
+			)
 		})
 
 		when("there is no descriptor file", func() {
