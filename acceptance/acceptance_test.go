@@ -272,7 +272,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 						h.Run(t, subjectPack("set-default-builder", builderName))
 					})
 
-					it.Focus("creates a runnable, rebuildable image on daemon from app dir", func() {
+					it("creates a runnable, rebuildable image on daemon from app dir", func() {
 						appPath := filepath.Join("testdata", "mock_app")
 						output := h.Run(t, subjectPack("build", repoName, "-p", appPath))
 						h.AssertContains(t, output, fmt.Sprintf("Successfully built image '%s'", repoName))
@@ -414,7 +414,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 						it.Before(func() {
 							h.SkipIf(t, !packSupports(packPath, "build --network"), "--network flag not supported for build")
 
-							buildpackTgz = h.CreateTGZ(t, filepath.Join(bpDir, "internet-capable-buildpack"), "./", 0766)
+							buildpackTgz = h.CreateTGZ(t, filepath.Join(bpDir, "internet-capable-buildpack"), "./", 0755)
 						})
 
 						it.After(func() {
@@ -480,7 +480,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 							var notBuilderTgz string
 
 							it.Before(func() {
-								notBuilderTgz = h.CreateTGZ(t, filepath.Join(bpDir, "not-in-builder-buildpack"), "./", 0766)
+								notBuilderTgz = h.CreateTGZ(t, filepath.Join(bpDir, "not-in-builder-buildpack"), "./", 0755)
 							})
 
 							it.After(func() {
@@ -539,7 +539,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 							var otherStackBuilderTgz string
 
 							it.Before(func() {
-								otherStackBuilderTgz = h.CreateTGZ(t, filepath.Join(bpDir, "other-stack-buildpack"), "./", 0766)
+								otherStackBuilderTgz = h.CreateTGZ(t, filepath.Join(bpDir, "other-stack-buildpack"), "./", 0755)
 							})
 
 							it.After(func() {

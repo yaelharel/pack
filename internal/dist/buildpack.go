@@ -21,7 +21,6 @@ type Blob interface {
 	Open() (io.ReadCloser, error)
 }
 
-// TODO: rename this
 type buildpack struct {
 	descriptor BuildpackDescriptor
 	Blob       `toml:"-"`
@@ -33,7 +32,7 @@ func (b *buildpack) Descriptor() BuildpackDescriptor {
 
 //go:generate mockgen -package testmocks -destination testmocks/mock_buildpack.go github.com/buildpack/pack/internal/dist Buildpack
 type Buildpack interface {
-	// Open returns a reader with contents structured as per the distribution spec
+	// Open returns a reader to a tar with contents structured as per the distribution spec
 	// (currently '/cnbs/buildpacks/{ID}/{version}/*', all entries with a zeroed-out
 	// timestamp and root UID/GID).
 	Open() (io.ReadCloser, error)
@@ -59,7 +58,7 @@ type Stack struct {
 
 // BuildpackFromRootBlob constructs a buildpack from a blob. It is assumed that the buildpack contents reside at the root of the
 // blob. The constructed buildpack contents will be structured as per the distribution spec (currently
-// '/cnbs/buildpacks/{ID}/{version}/*').
+// a tar with contents under '/cnbs/buildpacks/{ID}/{version}/*').
 func BuildpackFromRootBlob(blob Blob) (Buildpack, error) {
 	bpd := BuildpackDescriptor{}
 	rc, err := blob.Open()
@@ -92,13 +91,11 @@ func BuildpackFromRootBlob(blob Blob) (Buildpack, error) {
 	return &buildpack{descriptor: bpd, Blob: db}, nil
 }
 
-// BuildpackFromTarReadCloser constructs a buildpack from a ReadCloser to a tar. It is assumed that the buildpack
+// BuildpackFromTarBlob constructs a buildpack from a ReadCloser to a tar. It is assumed that the buildpack
 // contents are structured as per the distribution spec (currently '/cnbs/buildpacks/{ID}/{version}/*').
-func BuildpackFromTarReadCloser(bpd BuildpackDescriptor, rc io.ReadCloser) Buildpack {
+func BuildpackFromTarBlob(bpd BuildpackDescriptor, blob Blob) Buildpack {
 	return &buildpack{
-		Blob: &distBlob{
-			rc: rc,
-		},
+		Blob:       blob,
 		descriptor: bpd,
 	}
 }
@@ -117,8 +114,8 @@ func toDistBlob(bpd BuildpackDescriptor, blob Blob) (Blob, error) {
 	ts := archive.NormalizedDateTime
 
 	go func() {
-		defer tw.Close()
 		defer pw.Close()
+		defer tw.Close()
 
 		if err := tw.WriteHeader(&tar.Header{
 			Typeflag: tar.TypeDir,
@@ -180,7 +177,8 @@ func writeTar(tw *tar.Writer, blob Blob, baseTarDir string) error {
 			continue
 		}
 
-		header.Name = path.Clean(path.Join(baseTarDir, header.Name))
+		header.Mode = calcFileMode(header)
+		header.Name = path.Join(baseTarDir, header.Name)
 		header.Uid = 0
 		header.Gid = 0
 		err = tw.WriteHeader(header)
@@ -200,6 +198,35 @@ func writeTar(tw *tar.Writer, blob Blob, baseTarDir string) error {
 	}
 
 	return nil
+}
+
+func calcFileMode(header *tar.Header) int64 {
+	switch {
+	case header.Typeflag == tar.TypeDir:
+		return 0755
+	case nameOneOf(header.Name,
+		path.Join("bin", "detect"),
+		path.Join("bin", "build"),
+	):
+		return 0755
+	case anyExecBit(header.Mode):
+		return 0755
+	}
+
+	return 0644
+}
+
+func nameOneOf(name string, paths ...string) bool {
+	for _, p := range paths {
+		if name == p {
+			return true
+		}
+	}
+	return false
+}
+
+func anyExecBit(mode int64) bool {
+	return mode&0111 != 0
 }
 
 func validateDescriptor(bpd BuildpackDescriptor) error {

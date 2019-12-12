@@ -118,23 +118,114 @@ id = "some.stack.id"
 			h.AssertOnTarEntry(t, tarPath,
 				"/cnb/buildpacks/bp.one/1.2.3/bin",
 				h.IsDirectory(),
-				h.HasFileMode(0700),
+				h.HasFileMode(0755),
 				h.HasModTime(archive.NormalizedDateTime),
 			)
 
 			h.AssertOnTarEntry(t, tarPath,
 				"/cnb/buildpacks/bp.one/1.2.3/bin/detect",
-				h.HasFileMode(0700),
+				h.HasFileMode(0755),
 				h.HasModTime(archive.NormalizedDateTime),
 				h.ContentEquals("detect-contents"),
 			)
 
 			h.AssertOnTarEntry(t, tarPath,
 				"/cnb/buildpacks/bp.one/1.2.3/bin/build",
-				h.HasFileMode(0700),
+				h.HasFileMode(0755),
 				h.HasModTime(archive.NormalizedDateTime),
 				h.ContentEquals("build-contents"),
 			)
+		})
+
+		when("calculating permissions", func() {
+			it.Before(func() {
+				h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "buildpack.toml"), []byte(`
+api = "0.3"
+
+[buildpack]
+id = "bp.one"
+version = "1.2.3"
+
+[[stacks]]
+id = "some.stack.id"
+`), os.ModePerm))
+			})
+
+			when("no exec bits set", func() {
+				it("sets to 0755 if directory", func() {
+					h.AssertNil(t, os.MkdirAll(filepath.Join(tmpBpDir, "some-dir"), 0600))
+
+					bp, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
+					h.AssertNil(t, err)
+
+					tarPath := writeBlobToFile(bp)
+					defer os.Remove(tarPath)
+
+					h.AssertOnTarEntry(t, tarPath,
+						"/cnb/buildpacks/bp.one/1.2.3/some-dir",
+						h.HasFileMode(0755),
+					)
+				})
+			})
+
+			when("no exec bits set", func() {
+				it("sets to 0755 if 'bin/detect' or 'bin/build'", func() {
+					h.AssertNil(t, os.MkdirAll(filepath.Join(tmpBpDir, "bin"), 0700))
+
+					h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "bin", "detect"), []byte("detect-contents"), 0600))
+					h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "bin", "build"), []byte("build-contents"), 0600))
+
+					bp, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
+					h.AssertNil(t, err)
+
+					tarPath := writeBlobToFile(bp)
+					defer os.Remove(tarPath)
+
+					h.AssertOnTarEntry(t, tarPath,
+						"/cnb/buildpacks/bp.one/1.2.3/bin/detect",
+						h.HasFileMode(0755),
+					)
+
+					h.AssertOnTarEntry(t, tarPath,
+						"/cnb/buildpacks/bp.one/1.2.3/bin/build",
+						h.HasFileMode(0755),
+					)
+				})
+			})
+
+			when("not directory, 'bin/detect', or 'bin/build'", func() {
+				it("sets to 0755 if ANY exec bit is set", func() {
+					h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "some-file"), []byte("some-data"), 0700))
+
+					bp, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
+					h.AssertNil(t, err)
+
+					tarPath := writeBlobToFile(bp)
+					defer os.Remove(tarPath)
+
+					h.AssertOnTarEntry(t, tarPath,
+						"/cnb/buildpacks/bp.one/1.2.3/some-file",
+						h.HasFileMode(0755),
+					)
+				})
+			})
+
+			when("not directory, 'bin/detect', or 'bin/build'", func() {
+				it("sets to 0644 if NO exec bits set", func() {
+					h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "some-file"), []byte("some-data"), 0600))
+
+					bp, err := dist.BuildpackFromRootBlob(blob.NewBlob(tmpBpDir))
+					h.AssertNil(t, err)
+
+					tarPath := writeBlobToFile(bp)
+					defer os.Remove(tarPath)
+
+					h.AssertOnTarEntry(t, tarPath,
+						"/cnb/buildpacks/bp.one/1.2.3/some-file",
+						h.HasFileMode(0644),
+					)
+				})
+			})
 		})
 
 		when("there is no descriptor file", func() {

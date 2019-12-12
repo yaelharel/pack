@@ -24,6 +24,7 @@ func (l *Lifecycle) Detect(ctx context.Context, networkMode string) error {
 				"-platform", platformDir,
 			)...,
 		),
+		// WithRoot(),
 		WithNetwork(networkMode),
 	)
 	if err != nil {
@@ -113,6 +114,7 @@ func (l *Lifecycle) Build(ctx context.Context, networkMode string) error {
 			"-app", appDir,
 			"-platform", platformDir,
 		),
+		// WithRoot(),
 		WithNetwork(networkMode),
 	)
 	if err != nil {

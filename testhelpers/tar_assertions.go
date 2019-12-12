@@ -16,7 +16,6 @@ import (
 
 type TarEntryAssertion func(*testing.T, *tar.Header, []byte)
 
-// TODO: allow to take a stream instead?
 func AssertOnTarEntry(t *testing.T, tarFile, entryPath string, assertFns ...TarEntryAssertion) {
 	t.Helper()
 
