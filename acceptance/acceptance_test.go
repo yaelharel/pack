@@ -779,7 +779,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 				})
 			})
 
-			when.Focus("inspect-builder", func() {
+			when("inspect-builder", func() {
 				it("displays configuration for a builder (local and remote)", func() {
 					configuredRunImage := "some-registry.com/pack-test/run1"
 					output := h.Run(t, subjectPack("set-run-image-mirrors", "pack-test/run", "--mirror", configuredRunImage))
@@ -1460,6 +1460,7 @@ func createBuilder(t *testing.T, runImageMirror, configDir, packPath, lifecycleP
 	}
 
 	// ADD PACKAGE
+	// TODO: Handle adding simple-layers-buildpack if create-builder doesn't support packages
 	packageImageName := createPackage(t, configDir, tmpDir, packPath)
 	_, err = builderConfigFile.Write([]byte(fmt.Sprintf("[[packages]]\nref = \"%s\"\n", packageImageName)))
 	h.AssertNil(t, err)
@@ -1479,6 +1480,7 @@ func createBuilder(t *testing.T, runImageMirror, configDir, packPath, lifecycleP
 }
 
 func createPackage(t *testing.T, configDir, tmpDir, packPath string) string {
+	t.Helper()
 	t.Log("creating package image...")
 	// COPY package.toml
 	h.CopyFile(t, filepath.Join(configDir, "package.toml"), filepath.Join(tmpDir, "package.toml"))
@@ -1495,6 +1497,7 @@ func createPackage(t *testing.T, configDir, tmpDir, packPath string) string {
 }
 
 func createStack(t *testing.T, dockerCli *client.Client, runImageMirror string) error {
+	t.Helper()
 	t.Log("creating stack images...")
 
 	if err := createStackImage(dockerCli, runImage, filepath.Join("testdata", "mock_stack", "run")); err != nil {
@@ -1555,6 +1558,7 @@ func assertMockAppResponseContains(t *testing.T, launchPort string, timeout time
 }
 
 func assertHasBase(t *testing.T, image, base string) {
+	t.Helper()
 	imageInspect, _, err := dockerCli.ImageInspectWithRaw(context.Background(), image)
 	h.AssertNil(t, err)
 	baseInspect, _, err := dockerCli.ImageInspectWithRaw(context.Background(), base)
@@ -1610,6 +1614,7 @@ func runDockerImageExposePort(t *testing.T, containerName, repoName string) stri
 }
 
 func waitForResponse(t *testing.T, port string, timeout time.Duration) string {
+	t.Helper()
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	timer := time.NewTimer(timeout)
@@ -1683,6 +1688,7 @@ func imageLabel(t *testing.T, dockerCli *client.Client, repoName, labelName stri
 }
 
 func fillTemplate(t *testing.T, templatePath string, data map[string]interface{}) string {
+	t.Helper()
 	outputTemplate, err := ioutil.ReadFile(templatePath)
 	h.AssertNil(t, err)
 
