@@ -82,13 +82,11 @@ func BuildpackFromRootBlob(blob Blob) (Buildpack, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid buildpack.toml")
 	}
-
-	db, err := toDistBlob(bpd, blob)
-	if err != nil {
-		return nil, errors.Wrap(err, "creating distribution blob")
-	}
-
-	return &buildpack{descriptor: bpd, Blob: db}, nil
+	
+	return &buildpack{
+		descriptor: bpd,
+		Blob:       toDistBlob(bpd, blob),
+	}, nil
 }
 
 // BuildpackFromTarBlob constructs a buildpack from a ReadCloser to a tar. It is assumed that the buildpack
@@ -108,47 +106,79 @@ func (b *distBlob) Open() (io.ReadCloser, error) {
 	return b.rc, nil
 }
 
-func toDistBlob(bpd BuildpackDescriptor, blob Blob) (Blob, error) {
+func toDistBlob(bpd BuildpackDescriptor, blob Blob) Blob {
+	// errChan := make(chan error, 1)
 	pr, pw := io.Pipe()
 	tw := tar.NewWriter(pw)
 	ts := archive.NormalizedDateTime
 
 	go func() {
-		defer pw.Close()
+		var err error
+		defer func() {
+			pw.CloseWithError(err)
+		}()
+		
 		defer tw.Close()
 
-		if err := tw.WriteHeader(&tar.Header{
+		if err = tw.WriteHeader(&tar.Header{
 			Typeflag: tar.TypeDir,
 			Name:     path.Join(BuildpacksDir, bpd.EscapedID()),
 			Mode:     0755,
 			ModTime:  ts,
 		}); err != nil {
-			// FIXME: handle errors
-			// return nil, err
-			panic("fooooooo!")
+			return
 		}
 
 		baseTarDir := path.Join(BuildpacksDir, bpd.EscapedID(), bpd.Info.Version)
-		if err := tw.WriteHeader(&tar.Header{
+		if err = tw.WriteHeader(&tar.Header{
 			Typeflag: tar.TypeDir,
 			Name:     baseTarDir,
 			Mode:     0755,
 			ModTime:  ts,
 		}); err != nil {
-			// return nil, err
-			// FIXME: handle errors
-			panic("fooooooo!!!!!!11111")
+			return
 		}
-
-		if err := writeTar(tw, blob, baseTarDir); err != nil {
-			// return nil, errors.Wrapf(err, "creating layer tar for buildpack '%s:%s'", bpd.Info.ID, bpd.Info.Version)
-			panic("fooooooo!!!!!!11111222222345trrt")
+	
+		if err = writeTar(tw, blob, baseTarDir); err != nil {
+			err = errors.Wrapf(err, "creating layer tar for buildpack '%s:%s'", bpd.Info.ID, bpd.Info.Version)
+			return
 		}
 	}()
 
 	return &distBlob{
 		rc: pr,
-	}, nil
+	}
+	// return &distBlob{
+	// 	rc: &MyNewReader{
+	// 		source:  pr,
+	// 		errChan: errChan,
+	// 	},
+	// }
+}
+
+type MyNewReader struct {
+	source   io.ReadCloser
+	errChan  chan error
+	foundErr error
+}
+
+func (r *MyNewReader) Read(p []byte) (n int, err error) {
+	go func() {
+		r.foundErr = <-r.errChan
+	}()
+
+	n, err = r.source.Read(p)
+
+	if r.foundErr != nil {
+		return n, r.foundErr
+	}
+	return n, err
+}
+
+func (r *MyNewReader) Close() error {
+	err := r.source.Close()
+
+	return err
 }
 
 func writeTar(tw *tar.Writer, blob Blob, baseTarDir string) error {
@@ -186,6 +216,7 @@ func writeTar(tw *tar.Writer, blob Blob, baseTarDir string) error {
 			return errors.Wrapf(err, "failed to write header for '%s'", header.Name)
 		}
 
+		// TODO: copy here instead?
 		buf, err := ioutil.ReadAll(tr)
 		if err != nil {
 			return errors.Wrapf(err, "failed to read contents of '%s'", header.Name)

@@ -1,6 +1,7 @@
 package dist_test
 
 import (
+	"errors"
 	"io"
 	// "io"
 	"io/ioutil"
@@ -43,8 +44,7 @@ func testBuildpack(t *testing.T, when spec.G, it spec.S) {
 
 		bpReader, err := bp.Open()
 		h.AssertNil(t, err)
-		defer bpReader.Close()
-
+		
 		tmpDir, err := ioutil.TempDir("", "")
 		h.AssertNil(t, err)
 
@@ -53,6 +53,9 @@ func testBuildpack(t *testing.T, when spec.G, it spec.S) {
 		h.AssertNil(t, err)
 
 		_, err = io.Copy(bpWriter, bpReader)
+		h.AssertNil(t, err)
+
+		err = bpReader.Close()
 		h.AssertNil(t, err)
 
 		return path
@@ -135,6 +138,30 @@ id = "some.stack.id"
 				h.HasModTime(archive.NormalizedDateTime),
 				h.ContentEquals("build-contents"),
 			)
+		})
+		
+		it("surfaces errors encountered while reading blob", func() {
+			h.AssertNil(t, ioutil.WriteFile(filepath.Join(tmpBpDir, "buildpack.toml"), []byte(`
+api = "0.3"
+
+[buildpack]
+id = "bp.one"
+version = "1.2.3"
+
+[[stacks]]
+id = "some.stack.id"
+`), os.ModePerm))
+
+			bp, err := dist.BuildpackFromRootBlob(&errorBlob{
+				realBlob: blob.NewBlob(tmpBpDir),
+			})
+			h.AssertNil(t, err)
+
+			bpReader, err := bp.Open()
+			h.AssertNil(t, err)
+			
+			_, err = io.Copy(ioutil.Discard, bpReader)
+			h.AssertError(t, err, "error from errBlob")
 		})
 
 		when("calculating permissions", func() {
@@ -328,4 +355,17 @@ version = "1.2.3"
 			})
 		})
 	})
+}
+
+type errorBlob struct {
+	notFirst bool
+	realBlob dist.Blob
+}
+
+func (e *errorBlob) Open() (io.ReadCloser, error) {
+	if !e.notFirst {
+		e.notFirst = true
+		return e.realBlob.Open()
+	}
+	return nil, errors.New("error from errBlob")
 }
