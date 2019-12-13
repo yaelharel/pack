@@ -155,7 +155,7 @@ lifecycle:
 			combo.packPath,
 			combo.packFixturesDir,
 			combo.packCreateBuilderPath,
-			combo.builderTomlPath,
+			combo.packCreateBuilderFixturesDir,
 			combo.lifecyclePath,
 			combo.lifecycleDescriptor.Info.Version,
 			combo.lifecycleDescriptor.API.BuildpackVersion,
@@ -164,7 +164,7 @@ lifecycle:
 
 		combo := combo
 		suite(k, func(t *testing.T, when spec.G, it spec.S) {
-			testAcceptance(t, when, it, combo.packFixturesDir, combo.packPath, combo.packCreateBuilderPath, combo.builderTomlPath, combo.lifecyclePath, combo.lifecycleDescriptor)
+			testAcceptance(t, when, it, combo.packFixturesDir, combo.packPath, combo.packCreateBuilderPath, combo.packCreateBuilderFixturesDir, combo.lifecyclePath, combo.lifecycleDescriptor)
 		}, spec.Report(report.Terminal{}))
 	}
 
@@ -173,7 +173,7 @@ lifecycle:
 	h.AssertNil(t, suiteManager.CleanUp())
 }
 
-func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packPath, packCreateBuilderPath, builderTomlPath, lifecyclePath string, lifecycleDescriptor builder.LifecycleDescriptor) {
+func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packPath, packCreateBuilderPath, configDir, lifecyclePath string, lifecycleDescriptor builder.LifecycleDescriptor) {
 
 	var (
 		bpDir    = buildpacksDir(*lifecycleDescriptor.API.BuildpackVersion)
@@ -235,14 +235,14 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 			)
 
 			it.Before(func() {
-				key := taskKey("create-builder", runImageMirror, builderTomlPath, packCreateBuilderPath, lifecyclePath)
+				key := taskKey("create-builder", runImageMirror, configDir, packCreateBuilderPath, lifecyclePath)
 				value, err := suiteManager.RunTaskOnceString(key, func() (string, error) {
-					return createBuilder(t, runImageMirror, builderTomlPath, packCreateBuilderPath, lifecyclePath, lifecycleDescriptor), nil
+					return createBuilder(t, runImageMirror, configDir, packCreateBuilderPath, lifecyclePath, lifecycleDescriptor), nil
 				})
 				h.AssertNil(t, err)
-				// suiteManager.RegisterCleanUp("clean-"+key, func() error {
-				// 	return h.DockerRmi(dockerCli, value)
-				// })
+				suiteManager.RegisterCleanUp("clean-"+key, func() error {
+					return h.DockerRmi(dockerCli, value)
+				})
 
 				builderName = value
 			})
@@ -779,7 +779,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 				})
 			})
 
-			when("inspect-builder", func() {
+			when.Focus("inspect-builder", func() {
 				it("displays configuration for a builder (local and remote)", func() {
 					configuredRunImage := "some-registry.com/pack-test/run1"
 					output := h.Run(t, subjectPack("set-run-image-mirrors", "pack-test/run", "--mirror", configuredRunImage))
@@ -1086,6 +1086,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 		})
 
 		createPackageLocally := func(absConfigPath string) string {
+			t.Helper()
 			packageName := "test/package-" + h.RandString(10)
 			output, err := h.RunE(subjectPack("create-package", packageName, "-p", absConfigPath))
 			h.AssertNil(t, err)
@@ -1094,6 +1095,7 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 		}
 
 		createPackageRemotely := func(absConfigPath string) string {
+			t.Helper()
 			packageName := registryConfig.RepoName("test/package-" + h.RandString(10))
 			output, err := h.RunE(subjectPack("create-package", packageName, "-p", absConfigPath, "--publish"))
 			h.AssertNil(t, err)
@@ -1102,12 +1104,14 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 		}
 
 		assertImageExistsLocally := func(name string) {
+			t.Helper()
 			_, _, err := dockerCli.ImageInspectWithRaw(context.Background(), name)
 			h.AssertNil(t, err)
 
 		}
 
 		generateAggregatePackageToml := func(nestedPackageName string) string {
+			t.Helper()
 			packageTomlData := fillTemplate(t,
 				filepath.Join(packFixturesDir, "package_aggregate.toml"),
 				map[string]interface{}{"PackageName": nestedPackageName},
@@ -1213,12 +1217,12 @@ type runCombo struct {
 }
 
 type resolvedRunCombo struct {
-	builderTomlPath       string
-	packFixturesDir       string
-	packPath              string
-	packCreateBuilderPath string
-	lifecyclePath         string
-	lifecycleDescriptor   builder.LifecycleDescriptor
+	packCreateBuilderFixturesDir string
+	packFixturesDir              string
+	packPath                     string
+	packCreateBuilderPath        string
+	lifecyclePath                string
+	lifecycleDescriptor          builder.LifecycleDescriptor
 }
 
 func resolveRunCombinations(
@@ -1234,12 +1238,12 @@ func resolveRunCombinations(
 	for _, c := range combos {
 		key := fmt.Sprintf("p_%s cb_%s lc_%s", c.Pack, c.PackCreateBuilder, c.Lifecycle)
 		rc := resolvedRunCombo{
-			builderTomlPath:       filepath.Join("testdata", "pack_current", "builder.toml"),
-			packFixturesDir:       filepath.Join("testdata", "pack_current"),
-			packPath:              packPath,
-			packCreateBuilderPath: packPath,
-			lifecyclePath:         lifecyclePath,
-			lifecycleDescriptor:   lifecycleDescriptor,
+			packFixturesDir:              filepath.Join("testdata", "pack_current"),
+			packCreateBuilderFixturesDir: filepath.Join("testdata", "pack_current"),
+			packPath:                     packPath,
+			packCreateBuilderPath:        packPath,
+			lifecyclePath:                lifecyclePath,
+			lifecycleDescriptor:          lifecycleDescriptor,
 		}
 
 		if c.Pack == "previous" {
@@ -1257,7 +1261,7 @@ func resolveRunCombinations(
 			}
 
 			rc.packCreateBuilderPath = previousPackPath
-			rc.builderTomlPath = filepath.Join("testdata", "pack_previous", "builder.toml")
+			rc.packCreateBuilderFixturesDir = filepath.Join("testdata", "pack_previous")
 		}
 
 		if c.Lifecycle == "previous" {
@@ -1404,7 +1408,7 @@ func buildPack(t *testing.T) string {
 	return packPath
 }
 
-func createBuilder(t *testing.T, runImageMirror, builderTOMLPath, packPath, lifecyclePath string, lifecycleDescriptor builder.LifecycleDescriptor) string {
+func createBuilder(t *testing.T, runImageMirror, configDir, packPath, lifecyclePath string, lifecycleDescriptor builder.LifecycleDescriptor) string {
 	t.Log("creating builder image...")
 
 	// CREATE TEMP WORKING DIR
@@ -1418,7 +1422,7 @@ func createBuilder(t *testing.T, runImageMirror, builderTOMLPath, packPath, life
 	h.RecursiveCopy(t, buildpacksDir, tmpDir)
 
 	// AMEND builder.toml
-	h.CopyFile(t, builderTOMLPath, filepath.Join(tmpDir, "builder.toml"))
+	h.CopyFile(t, filepath.Join(configDir, "builder.toml"), filepath.Join(tmpDir, "builder.toml"))
 	builderConfigFile, err := os.OpenFile(filepath.Join(tmpDir, "builder.toml"), os.O_RDWR|os.O_APPEND, 0666)
 	h.AssertNil(t, err)
 
@@ -1440,15 +1444,13 @@ func createBuilder(t *testing.T, runImageMirror, builderTOMLPath, packPath, life
 		h.AssertNil(t, err)
 	}
 
-	builderConfigFile.Close()
-
-	// PACKAGE BUILDPACKS
+	// ARCHIVE BUILDPACKS
 	buildpacks := []string{
 		"noop-buildpack",
 		"not-in-builder-buildpack",
 		"other-stack-buildpack",
 		"read-env-buildpack",
-		"simple-layers-buildpack",
+		"simple-layers-buildpack", // from package
 	}
 
 	for _, v := range buildpacks {
@@ -1456,6 +1458,13 @@ func createBuilder(t *testing.T, runImageMirror, builderTOMLPath, packPath, life
 		err := os.Rename(tgz, filepath.Join(tmpDir, v+".tgz"))
 		h.AssertNil(t, err)
 	}
+
+	// ADD PACKAGE
+	packageImageName := createPackage(t, configDir, tmpDir, packPath)
+	_, err = builderConfigFile.Write([]byte(fmt.Sprintf("[[packages]]\nref = \"%s\"\n", packageImageName)))
+	h.AssertNil(t, err)
+
+	builderConfigFile.Close()
 
 	// NAME BUILDER
 	bldr := registryConfig.RepoName("test/builder-" + h.RandString(10))
@@ -1467,6 +1476,22 @@ func createBuilder(t *testing.T, runImageMirror, builderTOMLPath, packPath, life
 	h.AssertNil(t, h.PushImage(dockerCli, bldr, registryConfig))
 
 	return bldr
+}
+
+func createPackage(t *testing.T, configDir, tmpDir, packPath string) string {
+	t.Log("creating package image...")
+	// COPY package.toml
+	h.CopyFile(t, filepath.Join(configDir, "package.toml"), filepath.Join(tmpDir, "package.toml"))
+
+	// NAME PACKAGE
+	packageImageName := registryConfig.RepoName("test/package-" + h.RandString(10))
+
+	// CREATE PACKAGE
+	cmd := exec.Command(packPath, "create-package", "--no-color", packageImageName, "-p", filepath.Join(tmpDir, "package.toml"))
+	output := h.Run(t, cmd)
+	h.AssertContains(t, output, fmt.Sprintf("Successfully created package '%s'", packageImageName))
+	h.AssertNil(t, h.PushImage(dockerCli, packageImageName, registryConfig))
+	return packageImageName
 }
 
 func createStack(t *testing.T, dockerCli *client.Client, runImageMirror string) error {
