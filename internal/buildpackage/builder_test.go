@@ -58,7 +58,7 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 		})
 
 		when("validate stacks", func() {
-			when("buildpack doesn't have a declared stack", func() {
+			when("buildpack doesn't declare a stack or order", func() {
 				it("should error", func() {
 					buildpack, err := ifakes.NewFakeBuildpack(dist.BuildpackDescriptor{
 						API: api.MustParse("0.2"),
@@ -73,46 +73,36 @@ func testPackageBuilder(t *testing.T, when spec.G, it spec.S) {
 
 					subject.SetBuildpack(buildpack)
 					_, err = subject.Save("some/package", false)
-					h.AssertError(t, err, "buildpack 'bp.1.id@bp.1.version' must support at least one stack")
+					h.AssertError(t, err, "buildpack 'bp.1.id@bp.1.version' must support at least one stack or have an order")
 				})
 			})
 
-			when("dependency does not have any matching stack", func() {
-				it("should error", func() {
+			when("buildpack doesn't declared a stack but declares an order (metabuildpack)", func() {
+				it("should succeed", func() {
 					buildpack, err := ifakes.NewFakeBuildpack(dist.BuildpackDescriptor{
 						API: api.MustParse("0.2"),
 						Info: dist.BuildpackInfo{
 							ID:      "bp.1.id",
 							Version: "bp.1.version",
 						},
-						Stacks: []dist.Stack{
-							{ID: "stack.id.1", Mixins: []string{"Mixin-A"}},
+						Stacks: nil,
+						Order: dist.Order{
+							{
+								Group: []dist.BuildpackRef{
+									{BuildpackInfo: dist.BuildpackInfo{ID: "bp.nested.id", Version: "bp.nested.version"}},
+								},
+							},
 						},
-						Order: nil,
 					}, 0644)
 					h.AssertNil(t, err)
 
 					subject.SetBuildpack(buildpack)
-
-					dependency, err := ifakes.NewFakeBuildpack(dist.BuildpackDescriptor{
-						API: api.MustParse("0.2"),
-						Info: dist.BuildpackInfo{
-							ID:      "bp.2.id",
-							Version: "bp.2.version",
-						},
-						Stacks: []dist.Stack{
-							{ID: "stack.id.2", Mixins: []string{"Mixin-A"}},
-						},
-						Order: nil,
-					}, 0644)
-					h.AssertNil(t, err)
-
-					subject.AddDependency(dependency)
-
 					_, err = subject.Save("some/package", false)
-					h.AssertError(t, err, "buildpack 'bp.1.id@bp.1.version' does not support any stacks from 'bp.2.id@bp.2.version'")
+					h.AssertNil(t, err)
 				})
 			})
+
+			// TODO: same two tests as above, but with Dependency
 
 			when("dependency has stacks that aren't supported by buildpack", func() {
 				it("should only support common stacks", func() {

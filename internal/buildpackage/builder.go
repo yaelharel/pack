@@ -41,18 +41,21 @@ func (p *PackageBuilder) Save(repoName string, publish bool) (imgutil.Image, err
 		return nil, errors.New("buildpack must be set")
 	}
 
+	// TODO: Do we need to check main buildpack separately?
+	// Can we try starting with `stacks := []string{}`, then including
+	// `p.buildpack` in the for loop below (line 55)?
 	stacks := p.buildpack.Descriptor().Stacks
-	if len(stacks) == 0 {
+	if len(stacks) == 0 && len(p.buildpack.Descriptor().Order) == 0 {
 		return nil, errors.Errorf(
-			"buildpack %s must support at least one stack",
+			"buildpack %s must support at least one stack or have an order",
 			style.Symbol(p.buildpack.Descriptor().Info.FullName()),
 		)
 	}
 
-	for _, bp := range p.dependencies {
+	for _, bp := range p.dependencies { // TODO: append/prepend `p.buildpack` here instead?
 		bpd := bp.Descriptor()
 		stacks = stack.MergeCompatible(stacks, bpd.Stacks)
-		if len(stacks) == 0 {
+		if len(stacks) == 0 {  // TODO: check order here, only error if len(order) == 0 and len(stacks) == 0
 			return nil, errors.Errorf(
 				"buildpack %s does not support any stacks from %s",
 				style.Symbol(p.buildpack.Descriptor().Info.FullName()),
