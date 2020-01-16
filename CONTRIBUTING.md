@@ -58,10 +58,10 @@ make acceptance
 
 Options:
 
-| ENV_VAR   | Description                                                                   | Required |
+| ENV_VAR   | Description                                                                   | Default |
 |-----------|-------------------------------------------------------------------------------|----------|
-| PACK_PATH | Path to the `pack` binary to test (`pack` is compiled from source if omitted) | No |
-| COMPILE_PACK_WITH_VERSION |  | No |
+| PACK_PATH | Path to the `pack` binary to test | `pack` is compiled from source if omitted |
+| COMPILE_PACK_WITH_VERSION | If `PACK_PATH` is not set, the version `pack` is compiled with | `0.0.0` |
 
 Alternately, to run all tests:
 ```bash
