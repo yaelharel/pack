@@ -11,7 +11,9 @@ a PR to keep it up-to-date.
 - [Docker](https://www.docker.com/)
 
 ## Development
-
+| ENV_VAR      | Description                                                            | Default |
+|--------------|------------------------------------------------------------------------|---------|
+| GOCMD        | Change the `go` executable. For example, [richgo][rgo] for testing.    | go      |
 ### Building
 
 To build pack:
@@ -25,13 +27,21 @@ Options:
 
 | ENV_VAR      | Description                                                            | Default |
 |--------------|------------------------------------------------------------------------|---------|
-| GOCMD        | Change the `go` executable. For example, [richgo][rgo] for testing.    | go      |
 | PACK_BIN     | Change the name or location of the binary relative to `out/`.          | pack    |
-| PACK_VERSION | Tell `pack` what version to consider itself                            | `dev`   |
+| PACK_VERSION | Tell `pack` what version to consider itself                            | `dev-<timestamp>` |
 
 [rgo]: https://github.com/kyoh86/richgo
 
-_NOTE: This project uses [go modules](https://github.com/golang/go/wiki/Modules) for dependency management._
+> NOTE: This project uses [go modules](https://github.com/golang/go/wiki/Modules) for dependency management.
+
+To build and then archive `pack` into a TGZ file:
+```
+make build package
+```
+
+> NOTE: The same options as `make build` apply.
+
+This will output a file at the path `out/pack-<pack_version>.tgz`.
 
 ### Testing
 
@@ -45,6 +55,13 @@ To run acceptance tests:
 ```bash
 make acceptance
 ```
+
+Options:
+
+| ENV_VAR   | Description                                                                   | Required |
+|-----------|-------------------------------------------------------------------------------|----------|
+| PACK_PATH | Path to the `pack` binary to test (`pack` is compiled from source if omitted) | No |
+| COMPILE_PACK_WITH_VERSION |  | No |
 
 Alternately, to run all tests:
 ```bash
