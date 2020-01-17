@@ -15,6 +15,33 @@ const (
 	platformDir    = "/platform"
 )
 
+func (l *Lifecycle) All(ctx context.Context, opts LifecycleOptions, buildCache, launchCache string) error {
+	detect, err := l.NewPhase(
+		"all",
+		WithArgs(
+			l.withLogLevel(
+				"-app", appDir,
+				"-platform", platformDir,
+				"-cache-dir", cacheDir,
+				"-launch-cache", launchCacheDir,
+				"-layers", layersDir,
+				"-image", opts.RunImage,
+				"-daemon",
+				opts.Image.Name(),
+			)...,
+		),
+		WithNetwork(opts.Network),
+		WithDaemonAccess(),
+		WithBinds(fmt.Sprintf("%s:%s", buildCache, cacheDir)),
+		WithBinds(fmt.Sprintf("%s:%s", launchCache, launchCacheDir)),
+	)
+	if err != nil {
+		return err
+	}
+	defer detect.Cleanup()
+	return detect.Run(ctx)
+}
+
 func (l *Lifecycle) Detect(ctx context.Context, networkMode string) error {
 	detect, err := l.NewPhase(
 		"detector",

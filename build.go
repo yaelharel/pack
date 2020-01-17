@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/buildpacks/imgutil"
 	"github.com/docker/docker/api/types"
@@ -29,6 +30,7 @@ import (
 
 type Lifecycle interface {
 	Execute(ctx context.Context, opts build.LifecycleOptions) error
+	ExecuteAll(ctx context.Context, opts build.LifecycleOptions) error
 }
 
 type BuildOptions struct {
@@ -44,6 +46,7 @@ type BuildOptions struct {
 	Buildpacks        []string
 	ProxyConfig       *ProxyConfig // defaults to  environment proxy vars
 	ContainerConfig   ContainerConfig
+	All               bool
 }
 
 type ProxyConfig struct {
@@ -124,18 +127,37 @@ func (c *Client) Build(ctx context.Context, opts BuildOptions) error {
 		return errors.Errorf("Builder %s is incompatible with this version of pack", style.Symbol(opts.Builder))
 	}
 
-	return c.lifecycle.Execute(ctx, build.LifecycleOptions{
-		AppPath:    appPath,
-		Image:      imageRef,
-		Builder:    ephemeralBuilder,
-		RunImage:   runImageName,
-		ClearCache: opts.ClearCache,
-		Publish:    opts.Publish,
-		HTTPProxy:  proxyConfig.HTTPProxy,
-		HTTPSProxy: proxyConfig.HTTPSProxy,
-		NoProxy:    proxyConfig.NoProxy,
-		Network:    opts.ContainerConfig.Network,
-	})
+	start := time.Now()
+	defer func() {
+		c.logger.Infof("Execution time %f s", float64(time.Now().Sub(start).Milliseconds())/1000.0)
+	}()
+	if opts.All {
+		return c.lifecycle.ExecuteAll(ctx, build.LifecycleOptions{
+			AppPath:    appPath,
+			Image:      imageRef,
+			Builder:    ephemeralBuilder,
+			RunImage:   runImageName,
+			ClearCache: opts.ClearCache,
+			Publish:    opts.Publish,
+			HTTPProxy:  proxyConfig.HTTPProxy,
+			HTTPSProxy: proxyConfig.HTTPSProxy,
+			NoProxy:    proxyConfig.NoProxy,
+			Network:    opts.ContainerConfig.Network,
+		})
+	} else {
+		return c.lifecycle.Execute(ctx, build.LifecycleOptions{
+			AppPath:    appPath,
+			Image:      imageRef,
+			Builder:    ephemeralBuilder,
+			RunImage:   runImageName,
+			ClearCache: opts.ClearCache,
+			Publish:    opts.Publish,
+			HTTPProxy:  proxyConfig.HTTPProxy,
+			HTTPSProxy: proxyConfig.HTTPSProxy,
+			NoProxy:    proxyConfig.NoProxy,
+			Network:    opts.ContainerConfig.Network,
+		})
+	}
 }
 
 func (c *Client) processBuilderName(builderName string) (name.Reference, error) {

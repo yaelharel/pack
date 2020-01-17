@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
+	"runtime/pprof"
 
 	"github.com/heroku/color"
 	"github.com/pkg/errors"
@@ -19,6 +22,16 @@ var packClient pack.Client
 
 func main() {
 	// create logger with defaults
+	pprofpath := filepath.Join("cpu.prof")
+	fmt.Println("writing profile to", pprofpath)
+	f, err := os.Create(pprofpath)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
+
 	logger := clilogger.NewLogWithWriters(color.Stdout(), color.Stderr())
 
 	cobra.EnableCommandSorting = false

@@ -68,6 +68,21 @@ func (l *Lifecycle) CombinedExporterCacher() bool {
 	return api.MustParse(l.platformAPIVersion).Compare(api.MustParse("0.2")) >= 0
 }
 
+func (l *Lifecycle) ExecuteAll(ctx context.Context, opts LifecycleOptions) error {
+	l.Setup(opts)
+	defer l.Cleanup()
+
+	buildCache := cache.NewVolumeCache(opts.Image, "build", l.docker)
+	launchCache := cache.NewVolumeCache(opts.Image, "launch", l.docker)
+	l.logger.Debugf("Using build cache volume %s", style.Symbol(buildCache.Name()))
+
+	l.logger.Info(style.Step("LIFECYCLE"))
+	if err := l.All(ctx, opts, buildCache.Name(), launchCache.Name()); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (l *Lifecycle) Execute(ctx context.Context, opts LifecycleOptions) error {
 	l.Setup(opts)
 	defer l.Cleanup()

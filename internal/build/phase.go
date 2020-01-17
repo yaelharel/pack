@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/buildpacks/lifecycle/auth"
 	"github.com/docker/docker/api/types"
@@ -129,17 +130,26 @@ func WithNetwork(networkMode string) func(*Phase) (*Phase, error) {
 
 func (p *Phase) Run(ctx context.Context) error {
 	var err error
+	start := time.Now()
+	defer func() {
+		p.logger.Infof("Executing phase %s %f s", p.name, float64(time.Now().Sub(start).Milliseconds())/1000.0)
+	}()
 
 	p.ctr, err = p.docker.ContainerCreate(ctx, p.ctrConf, p.hostConf, nil, "")
 	if err != nil {
 		return errors.Wrapf(err, "failed to create '%s' container", p.name)
 	}
+	p.logger.Infof("Done created container after %f s", float64(time.Now().Sub(start).Milliseconds())/1000.0)
 
 	p.appOnce.Do(func() {
 		var (
 			appReader io.ReadCloser
 			clientErr error
 		)
+		start := time.Now()
+		defer func() {
+			p.logger.Infof("Copied app in %f s", float64(time.Now().Sub(start).Milliseconds())/1000.0)
+		}()
 		appReader, err = p.createAppReader()
 		if err != nil {
 			err = errors.Wrapf(err, "create tar archive from '%s'", p.appPath)
@@ -178,6 +188,10 @@ func (p *Phase) Run(ctx context.Context) error {
 }
 
 func (p *Phase) Cleanup() error {
+	start := time.Now()
+	defer func() {
+		p.logger.Infof("Cleanup phase %s %f s", p.name, float64(time.Now().Sub(start).Milliseconds())/1000.0)
+	}()
 	return p.docker.ContainerRemove(context.Background(), p.ctr.ID, types.ContainerRemoveOptions{Force: true})
 }
 
