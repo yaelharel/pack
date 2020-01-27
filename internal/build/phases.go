@@ -17,7 +17,7 @@ const (
 
 func (l *Lifecycle) All(ctx context.Context, opts LifecycleOptions, buildCache, launchCache string) error {
 	detect, err := l.NewPhase(
-		"all",
+		"make",
 		WithArgs(
 			l.withLogLevel(
 				"-app", appDir,
@@ -25,7 +25,9 @@ func (l *Lifecycle) All(ctx context.Context, opts LifecycleOptions, buildCache, 
 				"-cache-dir", cacheDir,
 				"-launch-cache", launchCacheDir,
 				"-layers", layersDir,
-				"-image", opts.RunImage,
+				"-tag", "foo",
+				"-tag", "bar",
+				"-run-image", opts.RunImage,
 				"-daemon",
 				opts.Image.Name(),
 			)...,
