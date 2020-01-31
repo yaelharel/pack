@@ -15,10 +15,21 @@ const (
 	platformDir    = "/platform"
 )
 
-func (l *Lifecycle) Detect(ctx context.Context, networkMode string, volumes []string) error {
-	detect, err := l.NewPhase(
+type RunnerCleaner interface {
+	Cleanup() error
+	Run(ctx context.Context) error
+}
+
+type PhaseManager interface {
+	New(name string, ops ...PhaseOperation) (RunnerCleaner, error)
+	WithArgs(args ...string) PhaseOperation
+	//WithNetwork(networkMode string) PhaseOperation
+}
+
+func (l *Lifecycle) Detect(ctx context.Context, networkMode string, volumes []string, phaseManager PhaseManager) error {
+	detect, err := phaseManager.New(
 		"detector",
-		WithArgs(
+		phaseManager.WithArgs(
 			l.withLogLevel(
 				"-app", appDir,
 				"-platform", platformDir,
