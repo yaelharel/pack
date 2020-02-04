@@ -22,7 +22,16 @@ type CreateBuilderOptions struct {
 	NoPull      bool
 }
 
+// No business logic
+// Binds and instantiates dependencies
+// Enables inversion for consumers (only where desired)
 func (c *Client) CreateBuilder(ctx context.Context, opts CreateBuilderOptions) error {
+	builderConfigValidator := NewRealActualBuilderConfigValidator()
+
+	builderCreator := NewBuilderCreator(builderConfigValidator)
+
+	return builderCreator.Create()
+
 	if err := validateBuilderConfig(opts.Config); err != nil {
 		return errors.Wrap(err, "invalid builder config")
 	}
