@@ -1,10 +1,10 @@
 package builder_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/heroku/color"
+	"github.com/pkg/errors"
 	"github.com/sclevine/spec"
 	"github.com/sclevine/spec/report"
 
@@ -15,10 +15,13 @@ import (
 
 type fakeBuilderConfigValidator struct {
 	validateReturns error
+	argForValidate  pubbldr.Config
 }
 
 func (b *fakeBuilderConfigValidator) Validate(config pubbldr.Config) error {
-	return b.validateFunc(config)
+	b.argForValidate = config
+
+	return b.validateReturns
 }
 
 func TestCreator(t *testing.T) {
@@ -29,40 +32,63 @@ func TestCreator(t *testing.T) {
 
 func testCreator(t *testing.T, when spec.G, it spec.S) {
 	when("Create", func() {
-		var (
-			builderConfigValidator *fakeBuilderConfigValidator
-			builderCreator         *builder.Creator
-		)
-
-		it.Before(func() {
-			builderConfigValidator = &fakeBuilderConfigValidator{}
-
-			builderCreator = builder.NewCreator(builderConfigValidator)
-		})
-
 		it("succeeds", func() {
-			err := builderCreator.Create()
+			builderCreator := newCreator()
+
+			config := pubbldr.Config{}
+
+			err := builderCreator.Create(config)
 			h.AssertNil(t, err)
 		})
 
-		when("builder config validator returns an error", func() {
-			it("returns an error", func() {
-				builderConfigValidator.validateReturns = errors.New("Something went wrong")
+		it("calls the validator with the config passed in to create", func() {
+			fakeBuilderConfigValidator := &fakeBuilderConfigValidator{}
 
-				err := builderCreator.Create()
-			})
+			builderCreator := newCreator(withValidator(fakeBuilderConfigValidator))
+
+			config := pubbldr.Config{Description: "Right!"}
+
+			err := builderCreator.Create(config)
+			h.AssertNil(t, err)
+
+			h.AssertEq(t, fakeBuilderConfigValidator.argForValidate, config)
 		})
 
 		when("builder config validator returns an error", func() {
 			it("returns an error", func() {
-				builderCreator = localCreatorMaker(withValidator(&fakeBuilderConfigValidator{validateReturns: errors.New("")}))
+				builderCreator := newCreator(withValidator(&fakeBuilderConfigValidator{
+					validateReturns: errors.New("Something went wrong"),
+				}))
 
-				err := builderCreator.Create()
+				config := pubbldr.Config{}
+
+				err := builderCreator.Create(config)
+				h.AssertNotNil(t, err)
 			})
 		})
 	})
 }
 
-func localCreatorMaker(ops ...func(creator *builder.Creator)) {
+type creatorDependencies struct {
+	configValidator *fakeBuilderConfigValidator
+}
 
+type creatorOption func(creator *creatorDependencies)
+
+func withValidator(validator *fakeBuilderConfigValidator) creatorOption {
+	return func(creator *creatorDependencies) {
+		creator.configValidator = validator
+	}
+}
+
+func newCreator(ops ...creatorOption) *builder.Creator {
+	conf := &creatorDependencies{
+		configValidator: &fakeBuilderConfigValidator{},
+	}
+
+	for _, op := range ops {
+		op(conf)
+	}
+
+	return builder.NewCreator(conf.configValidator)
 }

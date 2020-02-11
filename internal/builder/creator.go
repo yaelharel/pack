@@ -5,16 +5,19 @@ import (
 )
 
 type Creator struct {
+	configValidator ConfigValidator
 }
 
 type ConfigValidator interface {
 	Validate(config pubbldr.Config) error
 }
 
-func NewCreator() *Creator {
-	return &Creator{}
+func NewCreator(configValidator ConfigValidator) *Creator {
+	return &Creator{
+		configValidator: configValidator,
+	}
 }
 
-func (c *Creator) Create() error {
-	return nil
+func (c *Creator) Create(config pubbldr.Config) error {
+	return c.configValidator.Validate(config)
 }
