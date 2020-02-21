@@ -1321,7 +1321,6 @@ func extractLifecycleDescriptor(lcPath string) (builder.LifecycleDescriptor, err
 
 func packCmd(packHome string, packPath string, name string, args ...string) *exec.Cmd {
 	cmdArgs := append([]string{name}, args...)
-	cmdArgs = append(cmdArgs, "--no-color")
 	if packSupports(packPath, "--verbose") {
 		cmdArgs = append(cmdArgs, "--verbose")
 	}
@@ -1482,7 +1481,7 @@ func createBuilder(t *testing.T, runImageMirror, configDir, packPath, lifecycleP
 	bldr := registryConfig.RepoName("test/builder-" + h.RandString(10))
 
 	// CREATE BUILDER
-	cmd := exec.Command(packPath, "create-builder", "--no-color", bldr, "-b", filepath.Join(tmpDir, "builder.toml"))
+	cmd := exec.Command(packPath, "create-builder", bldr, "-b", filepath.Join(tmpDir, "builder.toml"))
 	output := h.Run(t, cmd)
 	h.AssertContains(t, output, fmt.Sprintf("Successfully created builder image '%s'", bldr))
 	h.AssertNil(t, h.PushImage(dockerCli, bldr, registryConfig))
@@ -1518,7 +1517,7 @@ func packageBuildpack(t *testing.T, configPath, packPath string, lifecycleDescri
 	packageImageName := registryConfig.RepoName(repoName + "-" + h.RandString(10))
 
 	// CREATE PACKAGE
-	cmd := exec.Command(packPath, "package-buildpack", "--no-color", packageImageName, "-p", filepath.Join(tmpDir, "package.toml"))
+	cmd := exec.Command(packPath, "package-buildpack", packageImageName, "-p", filepath.Join(tmpDir, "package.toml"))
 	output := h.Run(t, cmd)
 	h.AssertContains(t, output, fmt.Sprintf("Successfully created package '%s'", packageImageName))
 	h.AssertNil(t, h.PushImage(dockerCli, packageImageName, registryConfig))

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"golang.org/x/crypto/ssh/terminal"
 	"os"
 
 	"github.com/heroku/color"
@@ -35,6 +36,9 @@ func main() {
 			if fs := cmd.Flags(); fs != nil {
 				if flag, err := fs.GetBool("no-color"); err == nil {
 					color.Disable(flag)
+				}
+				if !runningInTTY() {
+					color.Disable(true)
 				}
 				if flag, err := fs.GetBool("quiet"); err == nil {
 					logger.WantQuiet(flag)
@@ -111,4 +115,8 @@ func initClient(logger logging.Logger) pack.Client {
 func exitError(logger logging.Logger, err error) {
 	logger.Error(err.Error())
 	os.Exit(1)
+}
+
+func runningInTTY() bool {
+	return terminal.IsTerminal(int(os.Stdout.Fd()))
 }
