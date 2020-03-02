@@ -60,6 +60,7 @@ type Builder struct {
 	StackID              string
 	replaceOrder         bool
 	order                dist.Order
+	os string
 }
 
 type orderTOML struct {
@@ -130,6 +131,11 @@ func constructBuilder(img imgutil.Image, newName string, metadata Metadata) (*Bu
 		return nil, err
 	}
 
+	imageOS, err := img.OS()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Builder{
 		baseImageName: baseName,
 		image:         img,
@@ -149,6 +155,7 @@ func constructBuilder(img imgutil.Image, newName string, metadata Metadata) (*Bu
 			},
 		},
 		env: map[string]string{},
+		os: imageOS,
 	}, nil
 }
 
@@ -291,6 +298,13 @@ func (b *Builder) Save(logger logging.Logger) error {
 		}
 
 		dist.AddBuildpackToLayersMD(bpLayers, bp.Descriptor(), diffID.String())
+	}
+
+	if true {
+		if err := b.image.Save(); err != nil {
+			return errors.Wrap(err, "failed to save")
+		}
+		return nil
 	}
 
 	if err := dist.SetLabel(b.image, dist.BuildpackLayersLabel, bpLayers); err != nil {
@@ -463,6 +477,10 @@ func userAndGroupIDs(img imgutil.Image) (int, int, error) {
 	return uid, gid, nil
 }
 
+//option tarInterface: replace all tar.NewWriter with OS-aware
+//option layerInterface: every time we write to layer, use getters, setters
+//option pathTranslator: layerTranslorDep.TranslateLayerPath(path)
+//option augment Image interface with layerFile add/delete
 func (b *Builder) defaultDirsLayer(dest string) (string, error) {
 	fh, err := os.Create(filepath.Join(dest, "dirs.tar"))
 	if err != nil {
@@ -474,6 +492,15 @@ func (b *Builder) defaultDirsLayer(dest string) (string, error) {
 	defer tw.Close()
 
 	ts := archive.NormalizedDateTime
+
+	if b.os == "windows" {
+		if err := tw.WriteHeader(&tar.Header{Name: "Files", Typeflag: tar.TypeDir}); err != nil {
+			return "", err
+		}
+		if err := tw.WriteHeader(&tar.Header{Name: "Hives", Typeflag: tar.TypeDir}); err != nil {
+			return "", err
+		}
+	}
 
 	if err := tw.WriteHeader(b.packOwnedDir(workspaceDir, ts)); err != nil {
 		return "", errors.Wrapf(err, "creating %s dir in layer", style.Symbol(workspaceDir))
@@ -505,7 +532,7 @@ func (b *Builder) defaultDirsLayer(dest string) (string, error) {
 func (b *Builder) packOwnedDir(path string, time time.Time) *tar.Header {
 	return &tar.Header{
 		Typeflag: tar.TypeDir,
-		Name:     path,
+		Name:     b.translateLayerPath(path),
 		Mode:     0755,
 		ModTime:  time,
 		Uid:      b.UID,
@@ -513,10 +540,17 @@ func (b *Builder) packOwnedDir(path string, time time.Time) *tar.Header {
 	}
 }
 
+func (b *Builder) translateLayerPath(layerPath string) string {
+	if b.os == "windows" {
+		return path.Join("Files", layerPath)
+	}
+	return layerPath
+}
+
 func (b *Builder) rootOwnedDir(path string, time time.Time) *tar.Header {
 	return &tar.Header{
 		Typeflag: tar.TypeDir,
-		Name:     path,
+		Name:     b.translateLayerPath(path),
 		Mode:     0755,
 		ModTime:  time,
 	}
@@ -585,7 +619,7 @@ func (b *Builder) embedLifecycleTar(tw *tar.Writer) error {
 		if pathMatches != nil {
 			binaryName := pathMatches[1]
 
-			header.Name = lifecycleDir + "/" + binaryName
+			header.Name = b.translateLayerPath(lifecycleDir + "/" + binaryName)
 			err = tw.WriteHeader(header)
 			if err != nil {
 				return errors.Wrapf(err, "failed to write header for '%s'", header.Name)
@@ -643,9 +677,21 @@ func (b *Builder) lifecycleLayer(dest string) (string, error) {
 	tw := tar.NewWriter(fh)
 	defer tw.Close()
 
+	if b.os == "windows" {
+		if err := tw.WriteHeader(&tar.Header{Name: "Files", Typeflag: tar.TypeDir}); err != nil {
+			return "", err
+		}
+		if err := tw.WriteHeader(&tar.Header{Name: "Files/cnb", Typeflag: tar.TypeDir}); err != nil {
+			return "", err
+		}
+		if err := tw.WriteHeader(&tar.Header{Name: "Hives", Typeflag: tar.TypeDir}); err != nil {
+			return "", err
+		}
+	}
+
 	if err := tw.WriteHeader(&tar.Header{
 		Typeflag: tar.TypeDir,
-		Name:     lifecycleDir,
+		Name:     b.translateLayerPath(lifecycleDir),
 		Mode:     0755,
 		ModTime:  archive.NormalizedDateTime,
 	}); err != nil {
@@ -657,15 +703,16 @@ func (b *Builder) lifecycleLayer(dest string) (string, error) {
 		return "", errors.Wrap(err, "embedding lifecycle tar")
 	}
 
-	if err := tw.WriteHeader(&tar.Header{
-		Name:     compatLifecycleDir,
-		Linkname: lifecycleDir,
-		Typeflag: tar.TypeSymlink,
-		Mode:     0644,
-		ModTime:  archive.NormalizedDateTime,
-	}); err != nil {
-		return "", errors.Wrapf(err, "creating %s symlink", style.Symbol(compatLifecycleDir))
+	if b.os != "windows" {
+		if err := tw.WriteHeader(&tar.Header{
+			Name:     compatLifecycleDir,
+			Linkname: lifecycleDir,
+			Typeflag: tar.TypeSymlink,
+			Mode:     0644,
+			ModTime:  archive.NormalizedDateTime,
+		}); err != nil {
+			return "", errors.Wrapf(err, "creating %s symlink", style.Symbol(compatLifecycleDir))
+		}
 	}
-
 	return fh.Name(), nil
 }
