@@ -267,17 +267,11 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 			runImageMirror = value
 		})
 
-		when.Focus("create-package for windows", func() {
+		when.Focus("create-builder for windows", func() {
 			it("succeeds", func() {
-				packageImageName := createPackage(t,
-					filepath.Join(configDir, "package.toml"),
-					packPath,
-					bpDir,
-					"test/package",
-					[]string{"simple-layers-buildpack"},
-				)
+				builderImageName := createWIPWindowsBuilder(t, runImageMirror, configDir, packCreateBuilderPath, lifecyclePath, bpDir, lifecycleDescriptor)
 
-				h.AssertEq(t, true, strings.HasPrefix(packageImageName, "test/package"))
+				h.AssertContains(t, builderImageName, "test/builder")
 			})
 		})
 
@@ -1431,6 +1425,73 @@ func buildPack(t *testing.T, compileVersion string) string {
 	}
 
 	return packPath
+}
+
+// WIP function as Windows Functionality is added
+// TODO: use createBuilder when features are ready
+func createWIPWindowsBuilder(t *testing.T, runImageMirror, configDir, packPath, lifecyclePath, buildpacksDir string, lifecycleDescriptor builder.LifecycleDescriptor) string {
+	t.Log("creating builder image...")
+
+	// CREATE TEMP WORKING DIR
+	tmpDir, err := ioutil.TempDir("", "create-test-builder")
+	h.AssertNil(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// DETERMINE TEST DATA
+	t.Log("using buildpacks from: ", buildpacksDir)
+	h.RecursiveCopy(t, buildpacksDir, tmpDir)
+
+	// ARCHIVE BUILDPACKS
+	buildpacks := []string{
+		"noop-buildpack",
+	}
+
+	for _, v := range buildpacks {
+		tgz := h.CreateTGZ(t, filepath.Join(buildpacksDir, v), "./", 0755)
+		err := os.Rename(tgz, filepath.Join(tmpDir, v+".tgz"))
+		h.AssertNil(t, err)
+	}
+
+	// RENDER builder.toml
+	cfgData := fillTemplate(t, filepath.Join(configDir, "wip_windows_builder.toml"), map[string]interface{}{
+		// N/A
+	})
+	err = ioutil.WriteFile(filepath.Join(tmpDir, "builder.toml"), []byte(cfgData), os.ModePerm)
+	h.AssertNil(t, err)
+
+	builderConfigFile, err := os.OpenFile(filepath.Join(tmpDir, "builder.toml"), os.O_RDWR|os.O_APPEND, os.ModePerm)
+	h.AssertNil(t, err)
+
+	// ADD run-image-mirrors
+	_, err = builderConfigFile.Write([]byte(fmt.Sprintf("run-image-mirrors = [\"%s\"]\n", runImageMirror)))
+	h.AssertNil(t, err)
+
+	// ADD lifecycle
+	_, err = builderConfigFile.Write([]byte("[lifecycle]\n"))
+	h.AssertNil(t, err)
+
+	if lifecyclePath != "" {
+		t.Logf("adding lifecycle path '%s' to builder config", lifecyclePath)
+		_, err = builderConfigFile.Write([]byte(fmt.Sprintf("uri = \"%s\"\n", strings.ReplaceAll(lifecyclePath, `\`, `\\`))))
+		h.AssertNil(t, err)
+	} else {
+		t.Logf("adding lifecycle version '%s' to builder config", lifecycleDescriptor.Info.Version.String())
+		_, err = builderConfigFile.Write([]byte(fmt.Sprintf("version = \"%s\"\n", lifecycleDescriptor.Info.Version.String())))
+		h.AssertNil(t, err)
+	}
+
+	builderConfigFile.Close()
+
+	// NAME BUILDER
+	bldr := registryConfig.RepoName("test/builder-" + h.RandString(10))
+
+	// CREATE BUILDER
+	cmd := exec.Command(packPath, "create-builder", "--no-color", bldr, "-b", filepath.Join(tmpDir, "builder.toml"))
+	output := h.Run(t, cmd)
+	h.AssertContains(t, output, fmt.Sprintf("Successfully created builder image '%s'", bldr))
+	h.AssertNil(t, h.PushImage(dockerCli, bldr, registryConfig))
+
+	return bldr
 }
 
 func createBuilder(t *testing.T, runImageMirror, configDir, packPath, lifecyclePath, buildpacksDir string, lifecycleDescriptor builder.LifecycleDescriptor) string {

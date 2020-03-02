@@ -1,5 +1,7 @@
 module github.com/buildpacks/pack
 
+replace github.com/buildpacks/imgutil => /Users/pivotal/workspace/imgutil
+
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Masterminds/semver v1.4.2

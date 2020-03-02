@@ -1,8 +1,0 @@
-Pack:
-  Version:  {{ .Version }}
-  OS/Arch:  {{ .OS }}/{{ .Arch }}
-
-Default Lifecycle Version:  0.6.1
-
-Config:
-  default-builder-image = "{{ .DefaultBuilder }}"

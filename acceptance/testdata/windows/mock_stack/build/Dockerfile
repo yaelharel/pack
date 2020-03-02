@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/windows/nanoserver:1809
 
-ENV CNB_USER_ID=S-1-1-0
-ENV CNB_GROUP_ID=S-1-1-0
+ENV CNB_USER_ID=0
+ENV CNB_GROUP_ID=0
 
 USER ContainerAdministrator
 
