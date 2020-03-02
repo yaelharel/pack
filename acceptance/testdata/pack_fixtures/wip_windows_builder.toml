@@ -1,0 +1,9 @@
+[[buildpacks]]
+  # intentionally missing id/version as they are optional
+  uri = "noop-buildpack.tgz"
+
+[stack]
+  id = "pack.test.stack"
+  build-image = "pack-test/build"
+  run-image = "pack-test/run"
+

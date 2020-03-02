@@ -1,0 +1,32 @@
+[[buildpacks]]
+  id = "read/env"
+  version = "read-env-version"
+  uri = "read-env-buildpack.tgz"
+
+[[buildpacks]]
+  # intentionally missing id/version as they are optional
+  uri = "noop-buildpack.tgz"
+
+[[buildpacks]]
+  # noop-buildpack-2 has the same id but a different version compared to noop-buildpack
+  uri = "noop-buildpack-2.tgz"
+
+[[buildpacks]]
+  image = "{{ .package_name }}"
+
+[[order]]
+[[order.group]]
+  id = "simple/layers"
+  # intentionlly missing version to test support
+
+[[order.group]]
+  id = "read/env"
+  version = "read-env-version"
+  optional = true
+
+[stack]
+  id = "pack.test.stack"
+  build-image = "pack-test/build"
+  run-image = "pack-test/run"
+
+# run-image-mirror and lifecycle are appended by acceptance tests
