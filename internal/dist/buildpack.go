@@ -120,11 +120,7 @@ func (b *distBlob) Open() (io.ReadCloser, error) {
 
 func toDistTar(tw *tar.Writer, bpd BuildpackDescriptor, blob Blob, imageOS string) error {
 	if imageOS == "windows" {
-		if err := InitializeWindowsLayer(tw); err != nil {
-			return err
-		}
-
-		if err := tw.WriteHeader(&tar.Header{Name: "Files/cnb/buildpacks", Typeflag: tar.TypeDir}); err != nil {
+		if err := InitializeWindowsLayer(tw, "Files/cnb", "Files/cnb/buildpacks"); err != nil {
 			return err
 		}
 	}

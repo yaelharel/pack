@@ -62,15 +62,14 @@ func TranslateLayerPath(layerPath, os string) string {
 	return layerPath
 }
 
-func InitializeWindowsLayer(tw *tar.Writer) error {
-	if err := tw.WriteHeader(&tar.Header{Name: "Files", Typeflag: tar.TypeDir}); err != nil {
-		return err
+func InitializeWindowsLayer(tw *tar.Writer, paths ...string) error {
+	paths = append([]string{"Files", "Hives"}, paths...)
+
+	for _, path := range paths {
+		if err := tw.WriteHeader(&tar.Header{Name: path, Typeflag: tar.TypeDir}); err != nil {
+			return err
+		}
 	}
-	if err := tw.WriteHeader(&tar.Header{Name: "Files/cnb", Typeflag: tar.TypeDir}); err != nil {
-		return err
-	}
-	if err := tw.WriteHeader(&tar.Header{Name: "Hives", Typeflag: tar.TypeDir}); err != nil {
-		return err
-	}
+
 	return nil
 }

@@ -1444,6 +1444,9 @@ func createWIPWindowsBuilder(t *testing.T, runImageMirror, configDir, packPath, 
 	// ARCHIVE BUILDPACKS
 	buildpacks := []string{
 		"noop-buildpack",
+		"noop-buildpack-2",
+		"other-stack-buildpack",
+		"read-env-buildpack",
 	}
 
 	for _, v := range buildpacks {

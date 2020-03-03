@@ -300,13 +300,6 @@ func (b *Builder) Save(logger logging.Logger) error {
 		dist.AddBuildpackToLayersMD(bpLayers, bp.Descriptor(), diffID.String())
 	}
 
-	if true {
-		if err := b.image.Save(); err != nil {
-			return errors.Wrap(err, "failed to save")
-		}
-		return nil
-	}
-
 	if err := dist.SetLabel(b.image, dist.BuildpackLayersLabel, bpLayers); err != nil {
 		return err
 	}
@@ -556,8 +549,23 @@ func (b *Builder) orderLayer(order dist.Order, dest string) (string, error) {
 	}
 
 	layerTar := filepath.Join(dest, "order.tar")
-	err = archive.CreateSingleFileTar(layerTar, orderPath, contents)
+
+	fh, err := os.Create(layerTar)
 	if err != nil {
+		return "", err
+	}
+	defer fh.Close()
+
+	tw := tar.NewWriter(fh)
+	defer tw.Close()
+
+	if b.os == "windows" { // TODO: consider making initialize a noop if linux
+		if err := dist.InitializeWindowsLayer(tw, "Files/cnb"); err != nil {
+			return "", err
+		}
+	}
+
+	if err := archive.AddFileToTar(tw, dist.TranslateLayerPath(orderPath, b.os), contents); err != nil {
 		return "", errors.Wrapf(err, "failed to create order.toml layer tar")
 	}
 
@@ -582,8 +590,23 @@ func (b *Builder) stackLayer(dest string) (string, error) {
 	}
 
 	layerTar := filepath.Join(dest, "stack.tar")
-	err = archive.CreateSingleFileTar(layerTar, stackPath, buf.String())
+
+	fh, err := os.Create(layerTar)
 	if err != nil {
+		return "", err
+	}
+	defer fh.Close()
+
+	tw := tar.NewWriter(fh)
+	defer tw.Close()
+
+	if b.os == "windows" { // TODO: consider making initialize a noop if linux
+		if err := dist.InitializeWindowsLayer(tw, "Files/cnb"); err != nil {
+			return "", err
+		}
+	}
+
+	if err := archive.AddFileToTar(tw, dist.TranslateLayerPath(stackPath, b.os), buf.String()); err != nil {
 		return "", errors.Wrapf(err, "failed to create stack.toml layer tar")
 	}
 
@@ -643,9 +666,15 @@ func (b *Builder) envLayer(dest string, env map[string]string) (string, error) {
 	tw := tar.NewWriter(fh)
 	defer tw.Close()
 
+	if b.os == "windows" { // TODO: consider making initialize a noop if linux
+		if err := dist.InitializeWindowsLayer(tw, "Files/platform"); err != nil {
+			return "", err
+		}
+	}
+
 	for k, v := range env {
 		if err := tw.WriteHeader(&tar.Header{
-			Name:    path.Join(platformDir, "env", k),
+			Name:    dist.TranslateLayerPath(path.Join(platformDir, "env", k), b.os),
 			Size:    int64(len(v)),
 			Mode:    0644,
 			ModTime: archive.NormalizedDateTime,
@@ -671,7 +700,7 @@ func (b *Builder) lifecycleLayer(dest string) (string, error) {
 	defer tw.Close()
 
 	if b.os == "windows" {
-		if err := dist.InitializeWindowsLayer(tw); err != nil {
+		if err := dist.InitializeWindowsLayer(tw, "Files/cnb"); err != nil {
 			return "", err
 		}
 	}
