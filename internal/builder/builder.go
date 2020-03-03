@@ -532,7 +532,7 @@ func (b *Builder) defaultDirsLayer(dest string) (string, error) {
 func (b *Builder) packOwnedDir(path string, time time.Time) *tar.Header {
 	return &tar.Header{
 		Typeflag: tar.TypeDir,
-		Name:     b.translateLayerPath(path),
+		Name:     dist.TranslateLayerPath(path, b.os),
 		Mode:     0755,
 		ModTime:  time,
 		Uid:      b.UID,
@@ -540,17 +540,10 @@ func (b *Builder) packOwnedDir(path string, time time.Time) *tar.Header {
 	}
 }
 
-func (b *Builder) translateLayerPath(layerPath string) string {
-	if b.os == "windows" {
-		return path.Join("Files", layerPath)
-	}
-	return layerPath
-}
-
 func (b *Builder) rootOwnedDir(path string, time time.Time) *tar.Header {
 	return &tar.Header{
 		Typeflag: tar.TypeDir,
-		Name:     b.translateLayerPath(path),
+		Name:     dist.TranslateLayerPath(path, b.os),
 		Mode:     0755,
 		ModTime:  time,
 	}
@@ -619,7 +612,7 @@ func (b *Builder) embedLifecycleTar(tw *tar.Writer) error {
 		if pathMatches != nil {
 			binaryName := pathMatches[1]
 
-			header.Name = b.translateLayerPath(lifecycleDir + "/" + binaryName)
+			header.Name = dist.TranslateLayerPath(lifecycleDir + "/" + binaryName, b.os)
 			err = tw.WriteHeader(header)
 			if err != nil {
 				return errors.Wrapf(err, "failed to write header for '%s'", header.Name)
@@ -678,20 +671,14 @@ func (b *Builder) lifecycleLayer(dest string) (string, error) {
 	defer tw.Close()
 
 	if b.os == "windows" {
-		if err := tw.WriteHeader(&tar.Header{Name: "Files", Typeflag: tar.TypeDir}); err != nil {
-			return "", err
-		}
-		if err := tw.WriteHeader(&tar.Header{Name: "Files/cnb", Typeflag: tar.TypeDir}); err != nil {
-			return "", err
-		}
-		if err := tw.WriteHeader(&tar.Header{Name: "Hives", Typeflag: tar.TypeDir}); err != nil {
+		if err := dist.InitializeWindowsLayer(tw); err != nil {
 			return "", err
 		}
 	}
 
 	if err := tw.WriteHeader(&tar.Header{
 		Typeflag: tar.TypeDir,
-		Name:     b.translateLayerPath(lifecycleDir),
+		Name:     dist.TranslateLayerPath(lifecycleDir, b.os),
 		Mode:     0755,
 		ModTime:  archive.NormalizedDateTime,
 	}); err != nil {

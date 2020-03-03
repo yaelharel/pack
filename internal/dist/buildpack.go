@@ -58,7 +58,7 @@ type Stack struct {
 // BuildpackFromRootBlob constructs a buildpack from a blob. It is assumed that the buildpack contents reside at the root of the
 // blob. The constructed buildpack contents will be structured as per the distribution spec (currently
 // a tar with contents under '/cnbs/buildpacks/{ID}/{version}/*').
-func BuildpackFromRootBlob(blob Blob) (Buildpack, error) {
+func BuildpackFromRootBlob(blob Blob, osOptions ...string) (Buildpack, error) {
 	bpd := BuildpackDescriptor{}
 	rc, err := blob.Open()
 	if err != nil {
@@ -82,10 +82,15 @@ func BuildpackFromRootBlob(blob Blob) (Buildpack, error) {
 		return nil, errors.Wrap(err, "invalid buildpack.toml")
 	}
 
+	imageOS := "linux"
+	if len(osOptions) == 1 {
+		imageOS = osOptions[0]
+	}
+
 	db := &distBlob{
 		openFn: func() io.ReadCloser {
 			return archive.GenerateTar(func(tw *tar.Writer) error {
-				return toDistTar(tw, bpd, blob)
+				return toDistTar(tw, bpd, blob, imageOS)
 			})
 		},
 	}
@@ -113,12 +118,22 @@ func (b *distBlob) Open() (io.ReadCloser, error) {
 	return b.openFn(), nil
 }
 
-func toDistTar(tw *tar.Writer, bpd BuildpackDescriptor, blob Blob) error {
+func toDistTar(tw *tar.Writer, bpd BuildpackDescriptor, blob Blob, imageOS string) error {
+	if imageOS == "windows" {
+		if err := InitializeWindowsLayer(tw); err != nil {
+			return err
+		}
+
+		if err := tw.WriteHeader(&tar.Header{Name: "Files/cnb/buildpacks", Typeflag: tar.TypeDir}); err != nil {
+			return err
+		}
+	}
+
 	ts := archive.NormalizedDateTime
 
 	if err := tw.WriteHeader(&tar.Header{
 		Typeflag: tar.TypeDir,
-		Name:     path.Join(BuildpacksDir, bpd.EscapedID()),
+		Name:     TranslateLayerPath(path.Join(BuildpacksDir, bpd.EscapedID()), imageOS),
 		Mode:     0755,
 		ModTime:  ts,
 	}); err != nil {
@@ -128,7 +143,7 @@ func toDistTar(tw *tar.Writer, bpd BuildpackDescriptor, blob Blob) error {
 	baseTarDir := path.Join(BuildpacksDir, bpd.EscapedID(), bpd.Info.Version)
 	if err := tw.WriteHeader(&tar.Header{
 		Typeflag: tar.TypeDir,
-		Name:     baseTarDir,
+		Name:     TranslateLayerPath(baseTarDir, imageOS),
 		Mode:     0755,
 		ModTime:  ts,
 	}); err != nil {
@@ -158,7 +173,7 @@ func toDistTar(tw *tar.Writer, bpd BuildpackDescriptor, blob Blob) error {
 		}
 
 		header.Mode = calcFileMode(header)
-		header.Name = path.Join(baseTarDir, header.Name)
+		header.Name = TranslateLayerPath(path.Join(baseTarDir, header.Name), imageOS)
 		err = tw.WriteHeader(header)
 		if err != nil {
 			return errors.Wrapf(err, "failed to write header for '%s'", header.Name)

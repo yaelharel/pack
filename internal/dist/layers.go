@@ -1,9 +1,11 @@
 package dist
 
 import (
+	"archive/tar"
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -51,4 +53,24 @@ func LayerDiffID(layerTarPath string) (v1.Hash, error) {
 	}
 
 	return hash, nil
+}
+
+func TranslateLayerPath(layerPath, os string) string {
+	if os == "windows" {
+		return path.Join("Files", layerPath)
+	}
+	return layerPath
+}
+
+func InitializeWindowsLayer(tw *tar.Writer) error {
+	if err := tw.WriteHeader(&tar.Header{Name: "Files", Typeflag: tar.TypeDir}); err != nil {
+		return err
+	}
+	if err := tw.WriteHeader(&tar.Header{Name: "Files/cnb", Typeflag: tar.TypeDir}); err != nil {
+		return err
+	}
+	if err := tw.WriteHeader(&tar.Header{Name: "Hives", Typeflag: tar.TypeDir}); err != nil {
+		return err
+	}
+	return nil
 }
