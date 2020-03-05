@@ -9,25 +9,28 @@ import (
 	"github.com/buildpacks/pack/internal/style"
 )
 
-type BindingsConfig map[string]BindingConfig
+type ServiceBindingsConfig struct {
+	Services []ServiceBindingConfig `toml:"services"`
+}
 
-type BindingConfig struct {
+type ServiceBindingConfig struct {
+	Name     string                 `toml:"name"`
 	Metadata map[string]interface{} `toml:"metadata"`
 	Secrets  map[string]interface{} `toml:"secrets"`
 }
 
-func ReadBindingsConfig(configReader io.Reader) (BindingsConfig, error) {
-	var bindings BindingsConfig
+func ReadBindingsConfig(configReader io.Reader) (ServiceBindingsConfig, error) {
+	var bindings ServiceBindingsConfig
 	_, err := toml.DecodeReader(configReader, &bindings)
 	if err != nil {
-		return BindingsConfig{}, errors.Wrap(err, "parsing bindings config")
+		return ServiceBindingsConfig{}, errors.Wrap(err, "parsing service bindings")
 	}
 
-	for binding, config := range bindings {
+	for _, sb := range bindings.Services {
 		for _, k := range []string{"kind", "provider", "tags"} {
-			if _, ok := config.Metadata[k]; !ok {
-				return nil, errors.Errorf("binding %s: missing metadata key %s",
-					style.Symbol(binding),
+			if _, ok := sb.Metadata[k]; !ok {
+				return ServiceBindingsConfig{}, errors.Errorf("binding %s: missing metadata key %s",
+					style.Symbol(sb.Name),
 					style.Symbol(k),
 				)
 			}

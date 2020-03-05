@@ -22,20 +22,33 @@ func testBindings(t *testing.T, when spec.G, it spec.S) {
 	when("#ReadBindingsConfig", func() {
 		it("parses the config when it exists", func() {
 			bindings, err := build.ReadBindingsConfig(strings.NewReader(`
-[bravo]
-[bravo.metadata]
-kind = "bravo-kind"
-provider = "bravo-provider"
-tags = ["bravo-tag-1", "bravo-tag-2"]
-other-key = "bravo-other-key"
+[[services]]
+  name = "bravo"
+  
+  [services.metadata]
+  kind = "bravo-kind"
+  provider = "bravo-provider"
+  tags = ["bravo-tag-1", "bravo-tag-2"]
+  some-key = "bravo-key"
+  other-keys = ["bravo-key-1", "bravo-key-2"]
+
+  [services.secrets]
+  some-secret = "bravo-secret"
+  other-secrets = ["bravo-secret-1", "bravo-secret-2"]
 `))
 			h.AssertNil(t, err)
 
-			h.AssertEq(t, bindings["bravo"].Metadata["kind"], "bravo-kind")
-			h.AssertEq(t, bindings["bravo"].Metadata["provider"], "bravo-provider")
-			h.AssertEq(t, bindings["bravo"].Metadata["tags"].([]interface{})[0], "bravo-tag-1")
-			h.AssertEq(t, bindings["bravo"].Metadata["tags"].([]interface{})[1], "bravo-tag-2")
-			h.AssertEq(t, bindings["bravo"].Metadata["other-key"], "bravo-other-key")
+			h.AssertEq(t, bindings.Services[0].Name, "bravo")
+			h.AssertEq(t, bindings.Services[0].Metadata["kind"], "bravo-kind")
+			h.AssertEq(t, bindings.Services[0].Metadata["provider"], "bravo-provider")
+			h.AssertEq(t, bindings.Services[0].Metadata["tags"].([]interface{})[0], "bravo-tag-1")
+			h.AssertEq(t, bindings.Services[0].Metadata["tags"].([]interface{})[1], "bravo-tag-2")
+			h.AssertEq(t, bindings.Services[0].Metadata["some-key"], "bravo-key")
+			h.AssertEq(t, bindings.Services[0].Metadata["other-keys"].([]interface{})[0], "bravo-key-1")
+			h.AssertEq(t, bindings.Services[0].Metadata["other-keys"].([]interface{})[1], "bravo-key-2")
+			h.AssertEq(t, bindings.Services[0].Secrets["some-secret"], "bravo-secret")
+			h.AssertEq(t, bindings.Services[0].Secrets["other-secrets"].([]interface{})[0], "bravo-secret-1")
+			h.AssertEq(t, bindings.Services[0].Secrets["other-secrets"].([]interface{})[1], "bravo-secret-2")
 		})
 
 		type testCase struct {
@@ -46,31 +59,34 @@ other-key = "bravo-other-key"
 		for _, tc := range []testCase{
 			{
 				"kind", `
-[bravo]
-[bravo.metadata]
-#kind = "bravo-kind"
-provider = "bravo-provider"
-tags = ["bravo-tag-1", "bravo-tag-2"]
+[[services]]
+  name = "bravo"
+  [services.metadata]
+# kind = "bravo-kind"
+  provider = "bravo-provider"
+  tags = ["bravo-tag-1", "bravo-tag-2"]
 `,
 			},
 
 			{
 				"provider", `
-[bravo]
-[bravo.metadata]
-kind = "bravo-kind"
-#provider = "bravo-provider"
-tags = ["bravo-tag-1", "bravo-tag-2"]
+[[services]]
+  name = "bravo"
+  [services.metadata]
+  kind = "bravo-kind"
+# provider = "bravo-provider"
+  tags = ["bravo-tag-1", "bravo-tag-2"]
 `,
 			},
 
 			{
 				"tags", `
-[bravo]
-[bravo.metadata]
-kind = "bravo-kind"
-provider = "bravo-provider"
-#tags = ["bravo-tag-1", "bravo-tag-2"]
+[[services]]
+  name = "bravo"
+  [services.metadata]
+  kind = "bravo-kind"
+  provider = "bravo-provider"
+# tags = ["bravo-tag-1", "bravo-tag-2"]
 `,
 			},
 		} {
