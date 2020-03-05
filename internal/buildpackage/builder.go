@@ -80,7 +80,7 @@ func (p *PackageBuilder) Save(repoName string, publish bool) (imgutil.Image, err
 
 	bpLayers := dist.BuildpackLayers{}
 	for _, bp := range append(p.dependencies, p.buildpack) {
-		bpLayerTar, err := dist.BuildpackToLayerTar(tmpDir, bp)
+		bpLayerTar, err := dist.BuildpackToLayerTar(tmpDir, bp, "TODO")
 		if err != nil {
 			return nil, err
 		}

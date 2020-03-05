@@ -11,6 +11,7 @@ import (
 type DefaultImageFactory struct {
 	dockerClient client.CommonAPIClient
 	keychain     authn.Keychain
+	imageOS      string
 }
 
 func NewFactory(dockerClient client.CommonAPIClient, keychain authn.Keychain) *DefaultImageFactory {

@@ -3,17 +3,17 @@ package dist
 import (
 	"archive/tar"
 	"fmt"
-	"io"
 	"os"
-	"path"
 	"path/filepath"
+
+	"github.com/buildpacks/pack/internal/layer"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/pkg/errors"
 )
 
-func BuildpackToLayerTar(dest string, bp Buildpack) (string, error) {
+func BuildpackToLayerTar(dest string, bp Buildpack, imageOS string) (string, error) {
 	bpd := bp.Descriptor()
 	bpReader, err := bp.Open()
 	if err != nil {
@@ -28,8 +28,12 @@ func BuildpackToLayerTar(dest string, bp Buildpack) (string, error) {
 	}
 	defer fh.Close()
 
-	if _, err := io.Copy(fh, bpReader); err != nil {
-		return "", errors.Wrap(err, "writing buildpack blob to tar")
+	tw := tar.NewReader(bpReader)
+	lw := layer.NewWriter(fh, imageOS)
+	defer lw.Close()
+
+	if err := lw.FromTarReader(tw); err != nil {
+		return "", errors.Wrap(err, "writing buildpack blob to layer tar")
 	}
 
 	return layerTar, nil
@@ -53,23 +57,4 @@ func LayerDiffID(layerTarPath string) (v1.Hash, error) {
 	}
 
 	return hash, nil
-}
-
-func TranslateLayerPath(layerPath, os string) string {
-	if os == "windows" {
-		return path.Join("Files", layerPath)
-	}
-	return layerPath
-}
-
-func InitializeWindowsLayer(tw *tar.Writer, paths ...string) error {
-	paths = append([]string{"Files", "Hives"}, paths...)
-
-	for _, path := range paths {
-		if err := tw.WriteHeader(&tar.Header{Name: path, Typeflag: tar.TypeDir}); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
