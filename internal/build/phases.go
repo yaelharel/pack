@@ -23,7 +23,11 @@ type RunnerCleaner interface {
 type PhaseManager interface {
 	New(name string, ops ...PhaseOperation) (RunnerCleaner, error)
 	WithArgs(args ...string) PhaseOperation
-	//WithNetwork(networkMode string) PhaseOperation
+	WithNetwork(networkMode string) PhaseOperation
+	WithDaemonAccess() PhaseOperation
+	WithBinds(binds ...string) PhaseOperation
+	WithRegistryAccess(repos ...string) PhaseOperation
+	WithRoot() PhaseOperation
 }
 
 func (l *Lifecycle) Detect(ctx context.Context, networkMode string, volumes []string, phaseManager PhaseManager) error {
@@ -35,8 +39,8 @@ func (l *Lifecycle) Detect(ctx context.Context, networkMode string, volumes []st
 				"-platform", platformDir,
 			)...,
 		),
-		WithNetwork(networkMode),
-		WithBinds(volumes...),
+		phaseManager.WithNetwork(networkMode),
+		phaseManager.WithBinds(volumes...),
 	)
 	if err != nil {
 		return err
@@ -45,17 +49,17 @@ func (l *Lifecycle) Detect(ctx context.Context, networkMode string, volumes []st
 	return detect.Run(ctx)
 }
 
-func (l *Lifecycle) Restore(ctx context.Context, cacheName string) error {
-	restore, err := l.NewPhase(
+func (l *Lifecycle) Restore(ctx context.Context, cacheName string, phaseManager PhaseManager) error {
+	restore, err := phaseManager.New(
 		"restorer",
-		WithDaemonAccess(),
-		WithArgs(
+		phaseManager.WithDaemonAccess(),
+		phaseManager.WithArgs(
 			l.withLogLevel(
 				"-cache-dir", cacheDir,
 				"-layers", layersDir,
 			)...,
 		),
-		WithBinds(fmt.Sprintf("%s:%s", cacheName, cacheDir)),
+		phaseManager.WithBinds(fmt.Sprintf("%s:%s", cacheName, cacheDir)),
 	)
 	if err != nil {
 		return err
@@ -64,8 +68,8 @@ func (l *Lifecycle) Restore(ctx context.Context, cacheName string) error {
 	return restore.Run(ctx)
 }
 
-func (l *Lifecycle) Analyze(ctx context.Context, repoName, cacheName string, publish, clearCache bool) error {
-	analyze, err := l.newAnalyze(repoName, cacheName, publish, clearCache)
+func (l *Lifecycle) Analyze(ctx context.Context, repoName, cacheName string, publish, clearCache bool, phaseManager PhaseManager) error {
+	analyze, err := l.newAnalyze(repoName, cacheName, publish, clearCache, phaseManager)
 	if err != nil {
 		return err
 	}
@@ -73,7 +77,7 @@ func (l *Lifecycle) Analyze(ctx context.Context, repoName, cacheName string, pub
 	return analyze.Run(ctx)
 }
 
-func (l *Lifecycle) newAnalyze(repoName, cacheName string, publish, clearCache bool) (*Phase, error) {
+func (l *Lifecycle) newAnalyze(repoName, cacheName string, publish, clearCache bool, phaseManager PhaseManager) (RunnerCleaner, error) {
 	args := []string{
 		"-layers", layersDir,
 		repoName,
@@ -85,18 +89,18 @@ func (l *Lifecycle) newAnalyze(repoName, cacheName string, publish, clearCache b
 	}
 
 	if publish {
-		return l.NewPhase(
+		return phaseManager.New(
 			"analyzer",
-			WithRegistryAccess(repoName),
-			WithRoot(),
-			WithArgs(args...),
-			WithBinds(fmt.Sprintf("%s:%s", cacheName, cacheDir)),
+			phaseManager.WithRegistryAccess(repoName),
+			phaseManager.WithRoot(),
+			phaseManager.WithArgs(args...),
+			phaseManager.WithBinds(fmt.Sprintf("%s:%s", cacheName, cacheDir)),
 		)
 	}
-	return l.NewPhase(
+	return phaseManager.New(
 		"analyzer",
-		WithDaemonAccess(),
-		WithArgs(
+		phaseManager.WithDaemonAccess(),
+		phaseManager.WithArgs(
 			l.withLogLevel(
 				prependArg(
 					"-daemon",
@@ -104,7 +108,7 @@ func (l *Lifecycle) newAnalyze(repoName, cacheName string, publish, clearCache b
 				)...,
 			)...,
 		),
-		WithBinds(fmt.Sprintf("%s:%s", cacheName, cacheDir)),
+		phaseManager.WithBinds(fmt.Sprintf("%s:%s", cacheName, cacheDir)),
 	)
 }
 
