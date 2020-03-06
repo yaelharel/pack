@@ -116,16 +116,16 @@ func prependArg(arg string, args []string) []string {
 	return append([]string{arg}, args...)
 }
 
-func (l *Lifecycle) Build(ctx context.Context, networkMode string, volumes []string) error {
-	build, err := l.NewPhase(
+func (l *Lifecycle) Build(ctx context.Context, networkMode string, volumes []string, phaseManager PhaseManager) error {
+	build, err := phaseManager.New(
 		"builder",
-		WithArgs(
+		phaseManager.WithArgs(
 			"-layers", layersDir,
 			"-app", appDir,
 			"-platform", platformDir,
 		),
-		WithNetwork(networkMode),
-		WithBinds(volumes...),
+		phaseManager.WithNetwork(networkMode),
+		phaseManager.WithBinds(volumes...),
 	)
 	if err != nil {
 		return err

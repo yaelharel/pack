@@ -100,7 +100,7 @@ func (l *Lifecycle) Execute(ctx context.Context, opts LifecycleOptions) error {
 
 	l.logger.Info(style.Step("BUILDING"))
 
-	if err := l.Build(ctx, opts.Network, opts.Volumes); err != nil {
+	if err := l.Build(ctx, opts.Network, opts.Volumes, nil); err != nil {
 		return err
 	}
 

@@ -180,7 +180,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 		})
 	})
 
-	when("Restore", func() {
+	when("#Restore", func() {
 		it("creates a phase and then runs it", func() {
 			lifecycle := fakeLifecycle(t)
 			fakePhase := &FakePhase{}
@@ -232,7 +232,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 		})
 	})
 
-	when("Analyze", func() {
+	when("#Analyze", func() {
 		it("creates a phase and then runs it", func() {
 			lifecycle := fakeLifecycle(t)
 			fakePhase := &FakePhase{}
@@ -374,6 +374,61 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 				h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
 				h.AssertEq(t, fakePhaseManager.WithBindsReceived[0], expectedBinds)
 			})
+		})
+	})
+
+	when("#Build", func() {
+		it("creates a phase and then runs it", func() {
+			lifecycle := fakeLifecycle(t)
+			fakePhase := &FakePhase{}
+			fakePhaseManager := fakePhaseManager(whichReturnsForNew(fakePhase))
+
+			err := lifecycle.Build(context.Background(), "test", []string{}, fakePhaseManager)
+			h.AssertNil(t, err)
+
+			h.AssertEq(t, fakePhase.CleanupCallCount, 1)
+			h.AssertEq(t, fakePhase.RunCallCount, 1)
+		})
+
+		it("configures the phase with the expected arguments", func() {
+			lifecycle := fakeLifecycle(t)
+			fakePhaseManager := fakePhaseManager()
+
+			err := lifecycle.Build(context.Background(), "test", []string{}, fakePhaseManager)
+			h.AssertNil(t, err)
+
+			h.AssertEq(t, fakePhaseManager.NewCalledWithName, "builder")
+			h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
+			assertIncludeAllExpectedArgPatterns(t,
+				fakePhaseManager.WithArgsReceived,
+				[]string{"-layers", "/layers"},
+				[]string{"-app", "/workspace"},
+				[]string{"-platform", "/platform"},
+			)
+		})
+
+		it("configures the phase with the expected network mode", func() {
+			lifecycle := fakeLifecycle(t)
+			fakePhaseManager := fakePhaseManager()
+			expectedNetworkMode := "some-network-mode"
+
+			err := lifecycle.Build(context.Background(), expectedNetworkMode, []string{}, fakePhaseManager)
+			h.AssertNil(t, err)
+
+			h.AssertEq(t, fakePhaseManager.WithNetworkCallCount, 1)
+			h.AssertEq(t, fakePhaseManager.WithNetworkReceived, expectedNetworkMode)
+		})
+
+		it("configures the phase with binds", func() {
+			lifecycle := fakeLifecycle(t)
+			fakePhaseManager := fakePhaseManager()
+			expectedBinds := []string{"some-volume"}
+
+			err := lifecycle.Build(context.Background(), "test", expectedBinds, fakePhaseManager)
+			h.AssertNil(t, err)
+
+			h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
+			h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds)
 		})
 	})
 }
