@@ -70,7 +70,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 		var err error
 		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
 		h.AssertNil(t, err)
-		subject, err = CreateFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger)
+		subject, err = CreateFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger, repoName)
 		h.AssertNil(t, err)
 	})
 
@@ -146,7 +146,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 			when("app is a zip", func() {
 				it("preserves original mod times", func() {
 					var err error
-					subject, err = CreateFakeLifecycle(filepath.Join("testdata", "fake-app.zip"), docker, logger)
+					subject, err = CreateFakeLifecycle(filepath.Join("testdata", "fake-app.zip"), docker, logger, repoName)
 					h.AssertNil(t, err)
 
 					assertAppModTimePreserved(t, subject, &outBuf, &errBuf)
@@ -181,7 +181,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 
 					it("returns an error", func() {
 						logger := ilogging.NewLogWithWriters(&outBuf, &outBuf)
-						subject, err = CreateFakeLifecycle(tmpFakeAppDir, docker, logger)
+						subject, err = CreateFakeLifecycle(tmpFakeAppDir, docker, logger, repoName)
 						h.AssertNil(t, err)
 
 						readPhase, err := subject.NewPhase(
@@ -367,7 +367,7 @@ func assertRunSucceeds(t *testing.T, phase *build.Phase, outBuf *bytes.Buffer, e
 	phase.Cleanup()
 }
 
-func CreateFakeLifecycle(appDir string, docker client.CommonAPIClient, logger logging.Logger) (*build.Lifecycle, error) {
+func CreateFakeLifecycle(appDir string, docker client.CommonAPIClient, logger logging.Logger, repoName string) (*build.Lifecycle, error) {
 	subject := build.NewLifecycle(docker, logger)
 	builderImage, err := local.NewImage(repoName, docker, local.FromBaseImage(repoName))
 	if err != nil {

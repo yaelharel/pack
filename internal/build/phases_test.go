@@ -17,18 +17,22 @@ import (
 	h "github.com/buildpacks/pack/testhelpers"
 )
 
+var (
+	phasesRepoName string
+)
+
 func TestPhases(t *testing.T) {
-	// TODO: shared with other test file; fix CreateFakeLifecycle
 	dockerCli, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
 	h.AssertNil(t, err)
 
-	repoName = "phase.test.lc-" + h.RandString(10) // TODO: reponame is globally referenced in CreateFakeLifecycle
+	phasesRepoName = "phases.test.lc-" + h.RandString(10)
 
 	wd, err := os.Getwd()
 	h.AssertNil(t, err)
 
-	h.CreateImageFromDir(t, dockerCli, repoName, filepath.Join(wd, "testdata", "fake-lifecycle"))
-	defer h.DockerRmi(dockerCli, repoName)
+	// Create fake builder
+	h.CreateImageFromDir(t, dockerCli, phasesRepoName, filepath.Join(wd, "testdata", "fake-lifecycle"))
+	defer h.DockerRmi(dockerCli, phasesRepoName)
 
 	spec.Run(t, "phases", testPhases, spec.Report(report.Terminal{}), spec.Sequential())
 }
@@ -456,11 +460,10 @@ func fakeLifecycle(t *testing.T) *build.Lifecycle {
 	var outBuf bytes.Buffer
 	logger := ilogging.NewLogWithWriters(&outBuf, &outBuf)
 
-	// TODO: see if we can use a fake docker client
 	docker, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
 	h.AssertNil(t, err)
 
-	lifecycle, err := CreateFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger)
+	lifecycle, err := CreateFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger, phasesRepoName)
 	h.AssertNil(t, err)
 
 	return lifecycle
