@@ -2,6 +2,7 @@ package build
 
 import (
 	"fmt"
+
 	"github.com/buildpacks/lifecycle/auth"
 	dcontainer "github.com/docker/docker/api/types/container"
 	"github.com/google/go-containerregistry/pkg/authn"

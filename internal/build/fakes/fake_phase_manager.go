@@ -44,7 +44,7 @@ func WhichReturnsForNew(phase build.RunnerCleaner) func(*FakePhaseManager) {
 }
 
 func (m *FakePhaseManager) New(name string, ops ...build.PhaseOperation) (build.RunnerCleaner, error) {
-	m.NewCallCount = m.NewCallCount + 1
+	m.NewCallCount++
 	m.NewCalledWithName = name
 	m.NewCalledWithOps = ops
 
@@ -52,7 +52,7 @@ func (m *FakePhaseManager) New(name string, ops ...build.PhaseOperation) (build.
 }
 
 func (m *FakePhaseManager) WithArgs(args ...string) build.PhaseOperation {
-	m.WithArgsCallCount = m.WithArgsCallCount + 1
+	m.WithArgsCallCount++
 	m.WithArgsReceived = args
 
 	return func(p *build.Phase) (phase *build.Phase, e error) {
@@ -61,7 +61,7 @@ func (m *FakePhaseManager) WithArgs(args ...string) build.PhaseOperation {
 }
 
 func (m *FakePhaseManager) WithNetwork(arg string) build.PhaseOperation {
-	m.WithNetworkCallCount = m.WithNetworkCallCount + 1
+	m.WithNetworkCallCount++
 	m.WithNetworkReceived = arg
 
 	return func(p *build.Phase) (phase *build.Phase, e error) {
@@ -70,7 +70,7 @@ func (m *FakePhaseManager) WithNetwork(arg string) build.PhaseOperation {
 }
 
 func (m *FakePhaseManager) WithDaemonAccess() build.PhaseOperation {
-	m.WithDaemonAccessCallCount = m.WithDaemonAccessCallCount + 1
+	m.WithDaemonAccessCallCount++
 
 	return func(p *build.Phase) (phase *build.Phase, e error) {
 		return nil, nil
@@ -78,7 +78,7 @@ func (m *FakePhaseManager) WithDaemonAccess() build.PhaseOperation {
 }
 
 func (m *FakePhaseManager) WithRoot() build.PhaseOperation {
-	m.WithRootCallCount = m.WithRootCallCount + 1
+	m.WithRootCallCount++
 
 	return func(p *build.Phase) (phase *build.Phase, e error) {
 		return nil, nil
@@ -86,7 +86,7 @@ func (m *FakePhaseManager) WithRoot() build.PhaseOperation {
 }
 
 func (m *FakePhaseManager) WithBinds(args ...string) build.PhaseOperation {
-	m.WithBindsCallCount = m.WithBindsCallCount + 1
+	m.WithBindsCallCount++
 	m.WithBindsReceived = args
 
 	return func(p *build.Phase) (phase *build.Phase, e error) {
@@ -95,7 +95,7 @@ func (m *FakePhaseManager) WithBinds(args ...string) build.PhaseOperation {
 }
 
 func (m *FakePhaseManager) WithRegistryAccess(args ...string) build.PhaseOperation {
-	m.WithRegistryAccessCallCount = m.WithRegistryAccessCallCount + 1
+	m.WithRegistryAccessCallCount++
 	m.WithRegistryAccessReceived = args
 
 	return func(p *build.Phase) (phase *build.Phase, e error) {

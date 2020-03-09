@@ -8,13 +8,13 @@ type FakePhase struct {
 }
 
 func (p *FakePhase) Cleanup() error {
-	p.CleanupCallCount = p.CleanupCallCount + 1
+	p.CleanupCallCount++
 
 	return nil
 }
 
 func (p *FakePhase) Run(ctx context.Context) error {
-	p.RunCallCount = p.RunCallCount + 1
+	p.RunCallCount++
 
 	return nil
 }

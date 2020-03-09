@@ -2,10 +2,11 @@ package testhelpers
 
 import (
 	"fmt"
-	"github.com/buildpacks/pack/internal/stringset"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/buildpacks/pack/internal/stringset"
 )
 
 func AssertIncludeAllExpectedArgPatterns(t *testing.T, receivedArgs []string, expectedPatterns ...[]string) {

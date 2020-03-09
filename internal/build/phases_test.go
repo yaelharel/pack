@@ -3,10 +3,11 @@ package build_test
 import (
 	"bytes"
 	"context"
-	"github.com/buildpacks/pack/internal/build/fakes"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/buildpacks/pack/internal/build/fakes"
 
 	"github.com/docker/docker/client"
 	"github.com/sclevine/spec"
