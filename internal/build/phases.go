@@ -134,8 +134,8 @@ func (l *Lifecycle) Build(ctx context.Context, networkMode string, volumes []str
 	return build.Run(ctx)
 }
 
-func (l *Lifecycle) Export(ctx context.Context, repoName string, runImage string, publish bool, launchCacheName, cacheName string) error {
-	export, err := l.newExport(repoName, runImage, publish, launchCacheName, cacheName)
+func (l *Lifecycle) Export(ctx context.Context, repoName string, runImage string, publish bool, launchCacheName, cacheName string, phaseManager PhaseManager) error {
+	export, err := l.newExport(repoName, runImage, publish, launchCacheName, cacheName, phaseManager)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (l *Lifecycle) Export(ctx context.Context, repoName string, runImage string
 	return export.Run(ctx)
 }
 
-func (l *Lifecycle) newExport(repoName, runImage string, publish bool, launchCacheName, cacheName string) (*Phase, error) {
+func (l *Lifecycle) newExport(repoName, runImage string, publish bool, launchCacheName, cacheName string, phaseManager PhaseManager) (RunnerCleaner, error) {
 	args := []string{
 		"-image", runImage,
 		"-cache-dir", cacheDir,
@@ -155,26 +155,26 @@ func (l *Lifecycle) newExport(repoName, runImage string, publish bool, launchCac
 	binds := []string{fmt.Sprintf("%s:%s", cacheName, cacheDir)}
 
 	if publish {
-		return l.NewPhase(
+		return phaseManager.New(
 			"exporter",
-			WithRegistryAccess(repoName, runImage),
-			WithArgs(
+			phaseManager.WithRegistryAccess(repoName, runImage),
+			phaseManager.WithArgs(
 				l.withLogLevel(args...)...,
 			),
-			WithRoot(),
-			WithBinds(binds...),
+			phaseManager.WithRoot(),
+			phaseManager.WithBinds(binds...),
 		)
 	}
 
 	args = append([]string{"-daemon", "-launch-cache", launchCacheDir}, args...)
 	binds = append(binds, fmt.Sprintf("%s:%s", launchCacheName, launchCacheDir))
-	return l.NewPhase(
+	return phaseManager.New(
 		"exporter",
-		WithDaemonAccess(),
-		WithArgs(
+		phaseManager.WithDaemonAccess(),
+		phaseManager.WithArgs(
 			l.withLogLevel(args...)...,
 		),
-		WithBinds(binds...),
+		phaseManager.WithBinds(binds...),
 	)
 }
 

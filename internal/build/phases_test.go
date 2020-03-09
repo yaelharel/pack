@@ -222,13 +222,13 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 		it("configures the phase with binds", func() {
 			lifecycle := fakeLifecycle(t)
 			fakePhaseManager := fakePhaseManager()
-			expectedBinds := "some-cache-name:/cache"
+			expectedBinds := []string{"some-cache-name:/cache"}
 
 			err := lifecycle.Restore(context.Background(), "some-cache-name", fakePhaseManager)
 			h.AssertNil(t, err)
 
 			h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
-			h.AssertEq(t, fakePhaseManager.WithBindsReceived[0], expectedBinds)
+			h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds[0])
 		})
 	})
 
@@ -285,13 +285,13 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 			it("configures the phase with registry access", func() {
 				lifecycle := fakeLifecycle(t)
 				fakePhaseManager := fakePhaseManager()
-				expectedRepoName := "some-repo-name"
+				expectedRepos := []string{"some-repo-name"}
 
-				err := lifecycle.Analyze(context.Background(), expectedRepoName, "test", true, false, fakePhaseManager)
+				err := lifecycle.Analyze(context.Background(), expectedRepos[0], "test", true, false, fakePhaseManager)
 				h.AssertNil(t, err)
 
 				h.AssertEq(t, fakePhaseManager.WithRegistryAccessCallCount, 1)
-				h.AssertEq(t, fakePhaseManager.WithRegistryAccessReceived[0], expectedRepoName)
+				h.AssertEq(t, fakePhaseManager.WithRegistryAccessReceived, expectedRepos)
 			})
 
 			it("configures the phase with root", func() {
@@ -324,13 +324,13 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 			it("configures the phase with binds", func() {
 				lifecycle := fakeLifecycle(t)
 				fakePhaseManager := fakePhaseManager()
-				expectedBinds := "some-cache-name:/cache"
+				expectedBinds := []string{"some-cache-name:/cache"}
 
 				err := lifecycle.Analyze(context.Background(), "test", "some-cache-name", true, false, fakePhaseManager)
 				h.AssertNil(t, err)
 
 				h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
-				h.AssertEq(t, fakePhaseManager.WithBindsReceived[0], expectedBinds)
+				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds[0])
 			})
 		})
 
@@ -366,13 +366,13 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 			it("configures the phase with binds", func() {
 				lifecycle := fakeLifecycle(t)
 				fakePhaseManager := fakePhaseManager()
-				expectedBinds := "some-cache-name:/cache"
+				expectedBinds := []string{"some-cache-name:/cache"}
 
 				err := lifecycle.Analyze(context.Background(), "test", "some-cache-name", false, true, fakePhaseManager)
 				h.AssertNil(t, err)
 
 				h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
-				h.AssertEq(t, fakePhaseManager.WithBindsReceived[0], expectedBinds)
+				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds[0])
 			})
 		})
 	})
@@ -429,6 +429,126 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 			h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
 			h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds)
+		})
+	})
+
+	when("#Export", func() {
+		it("creates a phase and then runs it", func() {
+			lifecycle := fakeLifecycle(t)
+			fakePhase := &FakePhase{}
+			fakePhaseManager := fakePhaseManager(whichReturnsForNew(fakePhase))
+
+			err := lifecycle.Export(context.Background(), "test", "test", false, "test", "test", fakePhaseManager)
+			h.AssertNil(t, err)
+
+			h.AssertEq(t, fakePhase.CleanupCallCount, 1)
+			h.AssertEq(t, fakePhase.RunCallCount, 1)
+		})
+
+		when("publish", func() {
+			it("configures the phase with registry access", func() {
+				lifecycle := fakeLifecycle(t)
+				fakePhaseManager := fakePhaseManager()
+				expectedRepos := []string{"some-repo-name", "some-run-image"}
+
+				err := lifecycle.Export(context.Background(), expectedRepos[0], expectedRepos[1], true, "test", "test", fakePhaseManager)
+				h.AssertNil(t, err)
+
+				h.AssertEq(t, fakePhaseManager.WithRegistryAccessCallCount, 1)
+				h.AssertEq(t, fakePhaseManager.WithRegistryAccessReceived, expectedRepos)
+			})
+
+			it("configures the phase with the expected arguments", func() {
+				lifecycle := fakeLifecycle(t)
+				fakePhaseManager := fakePhaseManager()
+				expectedRepoName := "some-repo-name"
+				expectedRunImage := "some-run-image"
+				expectedLaunchCacheName := "some-launch-cache"
+				expectedCacheName := "some-cache"
+
+				err := lifecycle.Export(context.Background(), expectedRepoName, expectedRunImage, true, expectedLaunchCacheName, expectedCacheName, fakePhaseManager)
+				h.AssertNil(t, err)
+
+				h.AssertEq(t, fakePhaseManager.NewCalledWithName, "exporter")
+				h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
+				assertIncludeAllExpectedArgPatterns(t,
+					fakePhaseManager.WithArgsReceived,
+					[]string{"-image", expectedRunImage},
+					[]string{"-cache-dir", "/cache"},
+					[]string{"-layers", "/layers"},
+					[]string{"-app", "/workspace"},
+					[]string{expectedRepoName},
+				)
+			})
+
+			it("configures the phase with root", func() {
+				lifecycle := fakeLifecycle(t)
+				fakePhaseManager := fakePhaseManager()
+
+				err := lifecycle.Export(context.Background(), "test", "test", true, "test", "test", fakePhaseManager)
+				h.AssertNil(t, err)
+
+				h.AssertEq(t, fakePhaseManager.WithRootCallCount, 1)
+			})
+
+			it("configures the phase with binds", func() {
+				lifecycle := fakeLifecycle(t)
+				fakePhaseManager := fakePhaseManager()
+				expectedBinds := []string{"some-cache-name:/cache"}
+
+				err := lifecycle.Export(context.Background(), "test", "test", true, "test", "some-cache-name", fakePhaseManager)
+				h.AssertNil(t, err)
+
+				h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
+				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds[0])
+			})
+		})
+
+		when("publish is false", func() {
+			it("configures the phase with daemon access", func() {
+				lifecycle := fakeLifecycle(t)
+				fakePhaseManager := fakePhaseManager()
+
+				err := lifecycle.Export(context.Background(), "test", "test", false, "test", "test", fakePhaseManager)
+				h.AssertNil(t, err)
+
+				h.AssertEq(t, fakePhaseManager.WithDaemonAccessCallCount, 1)
+			})
+
+			it("configures the phase with the expected arguments", func() {
+				lifecycle := fakeLifecycle(t)
+				fakePhaseManager := fakePhaseManager()
+				expectedRepoName := "some-repo-name"
+				expectedRunImage := "some-run-image"
+				expectedLaunchCacheName := "some-launch-cache"
+				expectedCacheName := "some-cache"
+
+				err := lifecycle.Export(context.Background(), expectedRepoName, expectedRunImage, false, expectedLaunchCacheName, expectedCacheName, fakePhaseManager)
+				h.AssertNil(t, err)
+
+				h.AssertEq(t, fakePhaseManager.NewCalledWithName, "exporter")
+				h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
+				assertIncludeAllExpectedArgPatterns(t,
+					fakePhaseManager.WithArgsReceived,
+					[]string{"-image", expectedRunImage},
+					[]string{"-cache-dir", "/cache"},
+					[]string{"-layers", "/layers"},
+					[]string{"-app", "/workspace"},
+					[]string{expectedRepoName},
+				)
+			})
+
+			it("configures the phase with binds", func() {
+				lifecycle := fakeLifecycle(t)
+				fakePhaseManager := fakePhaseManager()
+				expectedBinds := []string{"some-cache-name:/cache"}
+
+				err := lifecycle.Export(context.Background(), "test", "test", false, "test", "some-cache-name", fakePhaseManager)
+				h.AssertNil(t, err)
+
+				h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
+				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds[0])
+			})
 		})
 	})
 }
