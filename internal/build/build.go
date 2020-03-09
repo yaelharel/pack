@@ -81,31 +81,33 @@ func (l *Lifecycle) Execute(ctx context.Context, opts LifecycleOptions) error {
 		l.logger.Debugf("Build cache %s cleared", style.Symbol(buildCache.Name()))
 	}
 
+	phaseManager := NewConcretePhaseManager(l)
+
 	l.logger.Info(style.Step("DETECTING"))
-	if err := l.Detect(ctx, opts.Network, opts.Volumes, nil); err != nil {
+	if err := l.Detect(ctx, opts.Network, opts.Volumes, phaseManager); err != nil {
 		return err
 	}
 
 	l.logger.Info(style.Step("ANALYZING"))
-	if err := l.Analyze(ctx, opts.Image.Name(), buildCache.Name(), opts.Publish, opts.ClearCache, nil); err != nil {
+	if err := l.Analyze(ctx, opts.Image.Name(), buildCache.Name(), opts.Publish, opts.ClearCache, phaseManager); err != nil {
 		return err
 	}
 
 	l.logger.Info(style.Step("RESTORING"))
 	if opts.ClearCache {
 		l.logger.Info("Skipping 'restore' due to clearing cache")
-	} else if err := l.Restore(ctx, buildCache.Name(), nil); err != nil {
+	} else if err := l.Restore(ctx, buildCache.Name(), phaseManager); err != nil {
 		return err
 	}
 
 	l.logger.Info(style.Step("BUILDING"))
 
-	if err := l.Build(ctx, opts.Network, opts.Volumes, nil); err != nil {
+	if err := l.Build(ctx, opts.Network, opts.Volumes, phaseManager); err != nil {
 		return err
 	}
 
 	l.logger.Info(style.Step("EXPORTING"))
-	if err := l.Export(ctx, opts.Image.Name(), opts.RunImage, opts.Publish, launchCache.Name(), buildCache.Name(), nil); err != nil {
+	if err := l.Export(ctx, opts.Image.Name(), opts.RunImage, opts.Publish, launchCache.Name(), buildCache.Name(), phaseManager); err != nil {
 		return err
 	}
 

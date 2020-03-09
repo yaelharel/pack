@@ -58,7 +58,8 @@ func TestPhase(t *testing.T) {
 
 func testPhase(t *testing.T, when spec.G, it spec.S) {
 	var (
-		subject        *build.Lifecycle
+		lifecycle      *build.Lifecycle
+		subject        *build.ConcretePhaseManager
 		outBuf, errBuf bytes.Buffer
 		docker         client.CommonAPIClient
 		logger         logging.Logger
@@ -70,66 +71,67 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 		var err error
 		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
 		h.AssertNil(t, err)
-		subject, err = CreateFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger, repoName)
+		lifecycle, err = CreateFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger, repoName)
 		h.AssertNil(t, err)
+		subject = build.NewConcretePhaseManager(lifecycle)
 	})
 
 	it.After(func() {
-		h.AssertNil(t, subject.Cleanup())
+		h.AssertNil(t, lifecycle.Cleanup())
 	})
 
 	when("Phase", func() {
 		when("#Run", func() {
 			it("runs the subject phase on the builder image", func() {
-				phase, err := subject.NewPhase("phase")
+				phase, err := subject.New("phase")
 				h.AssertNil(t, err)
 				assertRunSucceeds(t, phase, &outBuf, &errBuf)
 				h.AssertContains(t, outBuf.String(), "running some-lifecycle-phase")
 			})
 
 			it("prefixes the output with the phase name", func() {
-				phase, err := subject.NewPhase("phase")
+				phase, err := subject.New("phase")
 				h.AssertNil(t, err)
 				assertRunSucceeds(t, phase, &outBuf, &errBuf)
 				h.AssertContains(t, outBuf.String(), "[phase] running some-lifecycle-phase")
 			})
 
 			it("attaches the same layers volume to each phase", func() {
-				writePhase, err := subject.NewPhase("phase", build.WithArgs("write", "/layers/test.txt", "test-layers"))
+				writePhase, err := subject.New("phase", subject.WithArgs("write", "/layers/test.txt", "test-layers"))
 				h.AssertNil(t, err)
 				assertRunSucceeds(t, writePhase, &outBuf, &errBuf)
 				h.AssertContains(t, outBuf.String(), "[phase] write test")
-				readPhase, err := subject.NewPhase("phase", build.WithArgs("read", "/layers/test.txt"))
+				readPhase, err := subject.New("phase", subject.WithArgs("read", "/layers/test.txt"))
 				h.AssertNil(t, err)
 				assertRunSucceeds(t, readPhase, &outBuf, &errBuf)
 				h.AssertContains(t, outBuf.String(), "[phase] file contents: test-layers")
 			})
 
 			it("attaches the same app volume to each phase", func() {
-				writePhase, err := subject.NewPhase("phase", build.WithArgs("write", "/workspace/test.txt", "test-app"))
+				writePhase, err := subject.New("phase", subject.WithArgs("write", "/workspace/test.txt", "test-app"))
 				h.AssertNil(t, err)
 				assertRunSucceeds(t, writePhase, &outBuf, &errBuf)
 				h.AssertContains(t, outBuf.String(), "[phase] write test")
 
-				readPhase, err := subject.NewPhase("phase", build.WithArgs("read", "/workspace/test.txt"))
+				readPhase, err := subject.New("phase", subject.WithArgs("read", "/workspace/test.txt"))
 				h.AssertNil(t, err)
 				assertRunSucceeds(t, readPhase, &outBuf, &errBuf)
 				h.AssertContains(t, outBuf.String(), "[phase] file contents: test-app")
 			})
 
 			it("copies the app into the app volume before the first phase", func() {
-				readPhase, err := subject.NewPhase("phase", build.WithArgs("read", "/workspace/fake-app-file"))
+				readPhase, err := subject.New("phase", subject.WithArgs("read", "/workspace/fake-app-file"))
 				h.AssertNil(t, err)
 				assertRunSucceeds(t, readPhase, &outBuf, &errBuf)
 				h.AssertContains(t, outBuf.String(), "[phase] file contents: fake-app-contents")
 				h.AssertContains(t, outBuf.String(), "[phase] file uid/gid: 111/222")
 
-				deletePhase, err := subject.NewPhase("phase", build.WithArgs("delete", "/workspace/fake-app-file"))
+				deletePhase, err := subject.New("phase", subject.WithArgs("delete", "/workspace/fake-app-file"))
 				h.AssertNil(t, err)
 				assertRunSucceeds(t, deletePhase, &outBuf, &errBuf)
 				h.AssertContains(t, outBuf.String(), "[phase] delete test")
 
-				readPhase2, err := subject.NewPhase("phase", build.WithArgs("read", "/workspace/fake-app-file"))
+				readPhase2, err := subject.New("phase", subject.WithArgs("read", "/workspace/fake-app-file"))
 				h.AssertNil(t, err)
 				err = readPhase2.Run(context.TODO())
 				readPhase2.Cleanup()
@@ -146,8 +148,9 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 			when("app is a zip", func() {
 				it("preserves original mod times", func() {
 					var err error
-					subject, err = CreateFakeLifecycle(filepath.Join("testdata", "fake-app.zip"), docker, logger, repoName)
+					lifecycle, err = CreateFakeLifecycle(filepath.Join("testdata", "fake-app.zip"), docker, logger, repoName)
 					h.AssertNil(t, err)
+					subject = build.NewConcretePhaseManager(lifecycle)
 
 					assertAppModTimePreserved(t, subject, &outBuf, &errBuf)
 				})
@@ -181,12 +184,13 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 
 					it("returns an error", func() {
 						logger := ilogging.NewLogWithWriters(&outBuf, &outBuf)
-						subject, err = CreateFakeLifecycle(tmpFakeAppDir, docker, logger, repoName)
+						lifecycle, err = CreateFakeLifecycle(tmpFakeAppDir, docker, logger, repoName)
 						h.AssertNil(t, err)
+						subject = build.NewConcretePhaseManager(lifecycle)
 
-						readPhase, err := subject.NewPhase(
+						readPhase, err := subject.New(
 							"phase",
-							build.WithArgs("read", "/workspace/fake-app-file"),
+							subject.WithArgs("read", "/workspace/fake-app-file"),
 						)
 						h.AssertNil(t, err)
 						err = readPhase.Run(context.TODO())
@@ -202,9 +206,9 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 			})
 
 			it("sets the proxy vars in the container", func() {
-				phase, err := subject.NewPhase(
+				phase, err := subject.New(
 					"phase",
-					build.WithArgs("proxy"),
+					subject.WithArgs("proxy"),
 				)
 				h.AssertNil(t, err)
 				assertRunSucceeds(t, phase, &outBuf, &errBuf)
@@ -218,7 +222,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 
 			when("#WithArgs", func() {
 				it("runs the subject phase with args", func() {
-					phase, err := subject.NewPhase("phase", build.WithArgs("some", "args"))
+					phase, err := subject.New("phase", subject.WithArgs("some", "args"))
 					h.AssertNil(t, err)
 					assertRunSucceeds(t, phase, &outBuf, &errBuf)
 					h.AssertContains(t, outBuf.String(), `received args [/cnb/lifecycle/phase some args]`)
@@ -227,10 +231,10 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 
 			when("#WithDaemonAccess", func() {
 				it("allows daemon access inside the container", func() {
-					phase, err := subject.NewPhase(
+					phase, err := subject.New(
 						"phase",
-						build.WithArgs("daemon"),
-						build.WithDaemonAccess(),
+						subject.WithArgs("daemon"),
+						subject.WithDaemonAccess(),
 					)
 					h.AssertNil(t, err)
 					assertRunSucceeds(t, phase, &outBuf, &errBuf)
@@ -240,10 +244,10 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 
 			when("#WithRoot", func() {
 				it("sets the containers user to root", func() {
-					phase, err := subject.NewPhase(
+					phase, err := subject.New(
 						"phase",
-						build.WithArgs("user"),
-						build.WithRoot(),
+						subject.WithArgs("user"),
+						subject.WithRoot(),
 					)
 					h.AssertNil(t, err)
 					assertRunSucceeds(t, phase, &outBuf, &errBuf)
@@ -257,10 +261,10 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 				})
 
 				it("mounts volumes inside container", func() {
-					phase, err := subject.NewPhase(
+					phase, err := subject.New(
 						"phase",
-						build.WithArgs("binds"),
-						build.WithBinds("some-volume:/mounted"),
+						subject.WithArgs("binds"),
+						subject.WithBinds("some-volume:/mounted"),
 					)
 					h.AssertNil(t, err)
 					assertRunSucceeds(t, phase, &outBuf, &errBuf)
@@ -289,10 +293,10 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 
 				it("provides auth for registry in the container", func() {
 					h.CreateImageOnRemote(t, dockerCli, registry, "packs/build:v3alpha2", "FROM busybox")
-					phase, err := subject.NewPhase(
+					phase, err := subject.New(
 						"phase",
-						build.WithArgs("registry", registry.RepoName("packs/build:v3alpha2")),
-						build.WithRegistryAccess(registry.RepoName("packs/build:v3alpha2")),
+						subject.WithArgs("registry", registry.RepoName("packs/build:v3alpha2")),
+						subject.WithRegistryAccess(registry.RepoName("packs/build:v3alpha2")),
 					)
 					h.AssertNil(t, err)
 					assertRunSucceeds(t, phase, &outBuf, &errBuf)
@@ -302,10 +306,10 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 
 			when("#WithNetwork", func() {
 				it("specifies a network for the container", func() {
-					phase, err := subject.NewPhase(
+					phase, err := subject.New(
 						"phase",
-						build.WithArgs("network"),
-						build.WithNetwork("none"),
+						subject.WithArgs("network"),
+						subject.WithNetwork("none"),
 					)
 					h.AssertNil(t, err)
 					assertRunSucceeds(t, phase, &outBuf, &errBuf)
@@ -318,19 +322,19 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 
 	when("#Cleanup", func() {
 		it.Before(func() {
-			phase, err := subject.NewPhase("phase")
+			phase, err := subject.New("phase")
 			h.AssertNil(t, err)
 			assertRunSucceeds(t, phase, &outBuf, &errBuf)
 			h.AssertContains(t, outBuf.String(), "running some-lifecycle-phase")
 
-			h.AssertNil(t, subject.Cleanup())
+			h.AssertNil(t, lifecycle.Cleanup())
 		})
 
 		it("should delete the layers volume", func() {
 			body, err := docker.VolumeList(context.TODO(),
 				filters.NewArgs(filters.KeyValuePair{
 					Key:   "name",
-					Value: subject.LayersVolume,
+					Value: lifecycle.LayersVolume,
 				}))
 			h.AssertNil(t, err)
 			h.AssertEq(t, len(body.Volumes), 0)
@@ -340,7 +344,7 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 			body, err := docker.VolumeList(context.TODO(),
 				filters.NewArgs(filters.KeyValuePair{
 					Key:   "name",
-					Value: subject.AppVolume,
+					Value: lifecycle.AppVolume,
 				}))
 			h.AssertNil(t, err)
 			h.AssertEq(t, len(body.Volumes), 0)
@@ -348,8 +352,8 @@ func testPhase(t *testing.T, when spec.G, it spec.S) {
 	})
 }
 
-func assertAppModTimePreserved(t *testing.T, subject *build.Lifecycle, outBuf *bytes.Buffer, errBuf *bytes.Buffer) {
-	readPhase, err := subject.NewPhase("phase", build.WithArgs("read", "/workspace/fake-app-file"))
+func assertAppModTimePreserved(t *testing.T, subject *build.ConcretePhaseManager, outBuf *bytes.Buffer, errBuf *bytes.Buffer) {
+	readPhase, err := subject.New("phase", subject.WithArgs("read", "/workspace/fake-app-file"))
 	h.AssertNil(t, err)
 	assertRunSucceeds(t, readPhase, outBuf, errBuf)
 
@@ -358,7 +362,7 @@ func assertAppModTimePreserved(t *testing.T, subject *build.Lifecycle, outBuf *b
 	h.AssertFalse(t, matches[1] == strconv.FormatInt(archive.NormalizedDateTime.Unix(), 10))
 }
 
-func assertRunSucceeds(t *testing.T, phase *build.Phase, outBuf *bytes.Buffer, errBuf *bytes.Buffer) {
+func assertRunSucceeds(t *testing.T, phase build.RunnerCleaner, outBuf *bytes.Buffer, errBuf *bytes.Buffer) {
 	t.Helper()
 	if err := phase.Run(context.TODO()); err != nil {
 		phase.Cleanup()
