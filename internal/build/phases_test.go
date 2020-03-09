@@ -3,11 +3,9 @@ package build_test
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"github.com/buildpacks/pack/internal/build/fakes"
 	"os"
 	"path/filepath"
-	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/docker/docker/client"
@@ -16,109 +14,8 @@ import (
 
 	"github.com/buildpacks/pack/internal/build"
 	ilogging "github.com/buildpacks/pack/internal/logging"
-	"github.com/buildpacks/pack/internal/stringset"
 	h "github.com/buildpacks/pack/testhelpers"
 )
-
-type FakePhase struct {
-	CleanupCallCount int
-	RunCallCount     int
-}
-
-func (p *FakePhase) Cleanup() error {
-	p.CleanupCallCount = p.CleanupCallCount + 1
-
-	return nil
-}
-
-func (p *FakePhase) Run(ctx context.Context) error {
-	p.RunCallCount = p.RunCallCount + 1
-
-	return nil
-}
-
-type FakePhaseManager struct {
-	NewCallCount      int
-	ReturnForNew      build.RunnerCleaner
-	NewCalledWithName string
-	NewCalledWithOps  []build.PhaseOperation
-
-	WithArgsCallCount int
-	WithArgsReceived  []string
-
-	WithNetworkCallCount int
-	WithNetworkReceived  string
-
-	WithDaemonAccessCallCount int
-
-	WithBindsCallCount int
-	WithBindsReceived  []string
-
-	WithRegistryAccessCallCount int
-	WithRegistryAccessReceived  []string
-
-	WithRootCallCount int
-}
-
-func (m *FakePhaseManager) New(name string, ops ...build.PhaseOperation) (build.RunnerCleaner, error) {
-	m.NewCallCount = m.NewCallCount + 1
-	m.NewCalledWithName = name
-	m.NewCalledWithOps = ops
-
-	return m.ReturnForNew, nil
-}
-
-func (m *FakePhaseManager) WithArgs(args ...string) build.PhaseOperation {
-	m.WithArgsCallCount = m.WithArgsCallCount + 1
-	m.WithArgsReceived = args
-
-	return func(p *build.Phase) (phase *build.Phase, e error) {
-		return nil, nil
-	}
-}
-
-func (m *FakePhaseManager) WithNetwork(arg string) build.PhaseOperation {
-	m.WithNetworkCallCount = m.WithNetworkCallCount + 1
-	m.WithNetworkReceived = arg
-
-	return func(p *build.Phase) (phase *build.Phase, e error) {
-		return nil, nil
-	}
-}
-
-func (m *FakePhaseManager) WithDaemonAccess() build.PhaseOperation {
-	m.WithDaemonAccessCallCount = m.WithDaemonAccessCallCount + 1
-
-	return func(p *build.Phase) (phase *build.Phase, e error) {
-		return nil, nil
-	}
-}
-
-func (m *FakePhaseManager) WithRoot() build.PhaseOperation {
-	m.WithRootCallCount = m.WithRootCallCount + 1
-
-	return func(p *build.Phase) (phase *build.Phase, e error) {
-		return nil, nil
-	}
-}
-
-func (m *FakePhaseManager) WithBinds(args ...string) build.PhaseOperation {
-	m.WithBindsCallCount = m.WithBindsCallCount + 1
-	m.WithBindsReceived = args
-
-	return func(p *build.Phase) (phase *build.Phase, e error) {
-		return nil, nil
-	}
-}
-
-func (m *FakePhaseManager) WithRegistryAccess(args ...string) build.PhaseOperation {
-	m.WithRegistryAccessCallCount = m.WithRegistryAccessCallCount + 1
-	m.WithRegistryAccessReceived = args
-
-	return func(p *build.Phase) (phase *build.Phase, e error) {
-		return nil, nil
-	}
-}
 
 func TestPhases(t *testing.T) {
 	// TODO: shared with other test file; fix CreateFakeLifecycle
@@ -140,8 +37,8 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 	when("#Detect", func() {
 		it("creates a phase and then runs it", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhase := &FakePhase{}
-			fakePhaseManager := fakePhaseManager(whichReturnsForNew(fakePhase))
+			fakePhase := &fakes.FakePhase{}
+			fakePhaseManager := fakes.NewFakePhaseManager(fakes.WhichReturnsForNew(fakePhase))
 
 			err := lifecycle.Detect(context.Background(), "test", fakePhaseManager)
 			h.AssertNil(t, err)
@@ -152,14 +49,14 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 		it("configures the phase with the expected arguments", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhaseManager := fakePhaseManager()
+			fakePhaseManager := fakes.NewFakePhaseManager()
 
 			err := lifecycle.Detect(context.Background(), "test", fakePhaseManager)
 			h.AssertNil(t, err)
 
 			h.AssertEq(t, fakePhaseManager.NewCalledWithName, "detector")
 			h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
-			assertIncludeAllExpectedArgPatterns(t,
+			h.AssertIncludeAllExpectedArgPatterns(t,
 				fakePhaseManager.WithArgsReceived,
 				//[]string{"-log-level", "debug"}, // TODO: test verbose logging
 				[]string{"-app", "/workspace"},
@@ -169,7 +66,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 		it("configures the phase with the expected network mode", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhaseManager := fakePhaseManager()
+			fakePhaseManager := fakes.NewFakePhaseManager()
 			expectedNetworkMode := "some-network-mode"
 
 			err := lifecycle.Detect(context.Background(), expectedNetworkMode, fakePhaseManager)
@@ -183,8 +80,8 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 	when("#Restore", func() {
 		it("creates a phase and then runs it", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhase := &FakePhase{}
-			fakePhaseManager := fakePhaseManager(whichReturnsForNew(fakePhase))
+			fakePhase := &fakes.FakePhase{}
+			fakePhaseManager := fakes.NewFakePhaseManager(fakes.WhichReturnsForNew(fakePhase))
 
 			err := lifecycle.Restore(context.Background(), "test", fakePhaseManager)
 			h.AssertNil(t, err)
@@ -195,7 +92,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 		it("configures the phase with daemon access", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhaseManager := fakePhaseManager()
+			fakePhaseManager := fakes.NewFakePhaseManager()
 
 			err := lifecycle.Restore(context.Background(), "test", fakePhaseManager)
 			h.AssertNil(t, err)
@@ -205,14 +102,14 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 		it("configures the phase with the expected arguments", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhaseManager := fakePhaseManager()
+			fakePhaseManager := fakes.NewFakePhaseManager()
 
 			err := lifecycle.Restore(context.Background(), "test", fakePhaseManager)
 			h.AssertNil(t, err)
 
 			h.AssertEq(t, fakePhaseManager.NewCalledWithName, "restorer")
 			h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
-			assertIncludeAllExpectedArgPatterns(t,
+			h.AssertIncludeAllExpectedArgPatterns(t,
 				fakePhaseManager.WithArgsReceived,
 				[]string{"-cache-dir", "/cache"},
 				[]string{"-layers", "/layers"},
@@ -221,22 +118,22 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 		it("configures the phase with binds", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhaseManager := fakePhaseManager()
-			expectedBinds := []string{"some-cache-name:/cache"}
+			fakePhaseManager := fakes.NewFakePhaseManager()
+			expectedBinds := []string{"some-cache:/cache"}
 
-			err := lifecycle.Restore(context.Background(), "some-cache-name", fakePhaseManager)
+			err := lifecycle.Restore(context.Background(), "some-cache", fakePhaseManager)
 			h.AssertNil(t, err)
 
 			h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
-			h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds[0])
+			h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds)
 		})
 	})
 
 	when("#Analyze", func() {
 		it("creates a phase and then runs it", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhase := &FakePhase{}
-			fakePhaseManager := fakePhaseManager(whichReturnsForNew(fakePhase))
+			fakePhase := &fakes.FakePhase{}
+			fakePhaseManager := fakes.NewFakePhaseManager(fakes.WhichReturnsForNew(fakePhase))
 
 			err := lifecycle.Analyze(context.Background(), "test", "test", false, false, fakePhaseManager)
 			h.AssertNil(t, err)
@@ -248,7 +145,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 		when("clear cache", func() {
 			it("configures the phase with the expected arguments", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 				expectedRepoName := "some-repo-name"
 
 				err := lifecycle.Analyze(context.Background(), expectedRepoName, "test", false, true, fakePhaseManager)
@@ -256,7 +153,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 				h.AssertEq(t, fakePhaseManager.NewCalledWithName, "analyzer")
 				h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
-				assertIncludeAllExpectedArgPatterns(t,
+				h.AssertIncludeAllExpectedArgPatterns(t,
 					fakePhaseManager.WithArgsReceived,
 					[]string{"-skip-layers"},
 				)
@@ -266,7 +163,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 		when("clear cache is false", func() {
 			it("configures the phase with the expected arguments", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 				expectedRepoName := "some-repo-name"
 
 				err := lifecycle.Analyze(context.Background(), expectedRepoName, "test", false, false, fakePhaseManager)
@@ -274,7 +171,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 				h.AssertEq(t, fakePhaseManager.NewCalledWithName, "analyzer")
 				h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
-				assertIncludeAllExpectedArgPatterns(t,
+				h.AssertIncludeAllExpectedArgPatterns(t,
 					fakePhaseManager.WithArgsReceived,
 					[]string{"-cache-dir", "/cache"},
 				)
@@ -284,7 +181,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 		when("publish", func() {
 			it("configures the phase with registry access", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 				expectedRepos := []string{"some-repo-name"}
 
 				err := lifecycle.Analyze(context.Background(), expectedRepos[0], "test", true, false, fakePhaseManager)
@@ -296,7 +193,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 			it("configures the phase with root", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 
 				err := lifecycle.Analyze(context.Background(), "test", "test", true, false, fakePhaseManager)
 				h.AssertNil(t, err)
@@ -306,7 +203,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 			it("configures the phase with the expected arguments", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 				expectedRepoName := "some-repo-name"
 
 				err := lifecycle.Analyze(context.Background(), expectedRepoName, "test", true, false, fakePhaseManager)
@@ -314,7 +211,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 				h.AssertEq(t, fakePhaseManager.NewCalledWithName, "analyzer")
 				h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
-				assertIncludeAllExpectedArgPatterns(t,
+				h.AssertIncludeAllExpectedArgPatterns(t,
 					fakePhaseManager.WithArgsReceived,
 					[]string{"-layers", "/layers"},
 					[]string{expectedRepoName},
@@ -323,21 +220,21 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 			it("configures the phase with binds", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
-				expectedBinds := []string{"some-cache-name:/cache"}
+				fakePhaseManager := fakes.NewFakePhaseManager()
+				expectedBinds := []string{"some-cache:/cache"}
 
-				err := lifecycle.Analyze(context.Background(), "test", "some-cache-name", true, false, fakePhaseManager)
+				err := lifecycle.Analyze(context.Background(), "test", "some-cache", true, false, fakePhaseManager)
 				h.AssertNil(t, err)
 
 				h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
-				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds[0])
+				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds)
 			})
 		})
 
 		when("publish is false", func() {
 			it("configures the phase with daemon access", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 
 				err := lifecycle.Analyze(context.Background(), "test", "test", false, false, fakePhaseManager)
 				h.AssertNil(t, err)
@@ -347,7 +244,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 			it("configures the phase with the expected arguments", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 				expectedRepoName := "some-repo-name"
 
 				err := lifecycle.Analyze(context.Background(), expectedRepoName, "test", false, true, fakePhaseManager)
@@ -355,7 +252,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 				h.AssertEq(t, fakePhaseManager.NewCalledWithName, "analyzer")
 				h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
-				assertIncludeAllExpectedArgPatterns(t,
+				h.AssertIncludeAllExpectedArgPatterns(t,
 					fakePhaseManager.WithArgsReceived,
 					[]string{"-daemon"},
 					[]string{"-layers", "/layers"},
@@ -365,14 +262,14 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 			it("configures the phase with binds", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
-				expectedBinds := []string{"some-cache-name:/cache"}
+				fakePhaseManager := fakes.NewFakePhaseManager()
+				expectedBinds := []string{"some-cache:/cache"}
 
-				err := lifecycle.Analyze(context.Background(), "test", "some-cache-name", false, true, fakePhaseManager)
+				err := lifecycle.Analyze(context.Background(), "test", "some-cache", false, true, fakePhaseManager)
 				h.AssertNil(t, err)
 
 				h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
-				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds[0])
+				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds)
 			})
 		})
 	})
@@ -380,8 +277,8 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 	when("#Build", func() {
 		it("creates a phase and then runs it", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhase := &FakePhase{}
-			fakePhaseManager := fakePhaseManager(whichReturnsForNew(fakePhase))
+			fakePhase := &fakes.FakePhase{}
+			fakePhaseManager := fakes.NewFakePhaseManager(fakes.WhichReturnsForNew(fakePhase))
 
 			err := lifecycle.Build(context.Background(), "test", []string{}, fakePhaseManager)
 			h.AssertNil(t, err)
@@ -392,14 +289,14 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 		it("configures the phase with the expected arguments", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhaseManager := fakePhaseManager()
+			fakePhaseManager := fakes.NewFakePhaseManager()
 
 			err := lifecycle.Build(context.Background(), "test", []string{}, fakePhaseManager)
 			h.AssertNil(t, err)
 
 			h.AssertEq(t, fakePhaseManager.NewCalledWithName, "builder")
 			h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
-			assertIncludeAllExpectedArgPatterns(t,
+			h.AssertIncludeAllExpectedArgPatterns(t,
 				fakePhaseManager.WithArgsReceived,
 				[]string{"-layers", "/layers"},
 				[]string{"-app", "/workspace"},
@@ -409,7 +306,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 		it("configures the phase with the expected network mode", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhaseManager := fakePhaseManager()
+			fakePhaseManager := fakes.NewFakePhaseManager()
 			expectedNetworkMode := "some-network-mode"
 
 			err := lifecycle.Build(context.Background(), expectedNetworkMode, []string{}, fakePhaseManager)
@@ -421,7 +318,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 		it("configures the phase with binds", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhaseManager := fakePhaseManager()
+			fakePhaseManager := fakes.NewFakePhaseManager()
 			expectedBinds := []string{"some-volume"}
 
 			err := lifecycle.Build(context.Background(), "test", expectedBinds, fakePhaseManager)
@@ -435,8 +332,8 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 	when("#Export", func() {
 		it("creates a phase and then runs it", func() {
 			lifecycle := fakeLifecycle(t)
-			fakePhase := &FakePhase{}
-			fakePhaseManager := fakePhaseManager(whichReturnsForNew(fakePhase))
+			fakePhase := &fakes.FakePhase{}
+			fakePhaseManager := fakes.NewFakePhaseManager(fakes.WhichReturnsForNew(fakePhase))
 
 			err := lifecycle.Export(context.Background(), "test", "test", false, "test", "test", fakePhaseManager)
 			h.AssertNil(t, err)
@@ -448,7 +345,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 		when("publish", func() {
 			it("configures the phase with registry access", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 				expectedRepos := []string{"some-repo-name", "some-run-image"}
 
 				err := lifecycle.Export(context.Background(), expectedRepos[0], expectedRepos[1], true, "test", "test", fakePhaseManager)
@@ -460,7 +357,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 			it("configures the phase with the expected arguments", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 				expectedRepoName := "some-repo-name"
 				expectedRunImage := "some-run-image"
 				expectedLaunchCacheName := "some-launch-cache"
@@ -471,7 +368,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 				h.AssertEq(t, fakePhaseManager.NewCalledWithName, "exporter")
 				h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
-				assertIncludeAllExpectedArgPatterns(t,
+				h.AssertIncludeAllExpectedArgPatterns(t,
 					fakePhaseManager.WithArgsReceived,
 					[]string{"-image", expectedRunImage},
 					[]string{"-cache-dir", "/cache"},
@@ -483,7 +380,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 			it("configures the phase with root", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 
 				err := lifecycle.Export(context.Background(), "test", "test", true, "test", "test", fakePhaseManager)
 				h.AssertNil(t, err)
@@ -493,21 +390,21 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 			it("configures the phase with binds", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
-				expectedBinds := []string{"some-cache-name:/cache"}
+				fakePhaseManager := fakes.NewFakePhaseManager()
+				expectedBinds := []string{"some-cache:/cache"}
 
-				err := lifecycle.Export(context.Background(), "test", "test", true, "test", "some-cache-name", fakePhaseManager)
+				err := lifecycle.Export(context.Background(), "test", "test", true, "test", "some-cache", fakePhaseManager)
 				h.AssertNil(t, err)
 
 				h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
-				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds[0])
+				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds)
 			})
 		})
 
 		when("publish is false", func() {
 			it("configures the phase with daemon access", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 
 				err := lifecycle.Export(context.Background(), "test", "test", false, "test", "test", fakePhaseManager)
 				h.AssertNil(t, err)
@@ -517,7 +414,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 			it("configures the phase with the expected arguments", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
+				fakePhaseManager := fakes.NewFakePhaseManager()
 				expectedRepoName := "some-repo-name"
 				expectedRunImage := "some-run-image"
 				expectedLaunchCacheName := "some-launch-cache"
@@ -528,26 +425,28 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 
 				h.AssertEq(t, fakePhaseManager.NewCalledWithName, "exporter")
 				h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
-				assertIncludeAllExpectedArgPatterns(t,
+				h.AssertIncludeAllExpectedArgPatterns(t,
 					fakePhaseManager.WithArgsReceived,
 					[]string{"-image", expectedRunImage},
 					[]string{"-cache-dir", "/cache"},
 					[]string{"-layers", "/layers"},
 					[]string{"-app", "/workspace"},
 					[]string{expectedRepoName},
+					[]string{"-daemon"},
+					[]string{"-launch-cache", "/launch-cache"},
 				)
 			})
 
 			it("configures the phase with binds", func() {
 				lifecycle := fakeLifecycle(t)
-				fakePhaseManager := fakePhaseManager()
-				expectedBinds := []string{"some-cache-name:/cache"}
+				fakePhaseManager := fakes.NewFakePhaseManager()
+				expectedBinds := []string{"some-cache:/cache", "some-launch-cache:/launch-cache"}
 
-				err := lifecycle.Export(context.Background(), "test", "test", false, "test", "some-cache-name", fakePhaseManager)
+				err := lifecycle.Export(context.Background(), "test", "test", false, "some-launch-cache", "some-cache", fakePhaseManager)
 				h.AssertNil(t, err)
 
 				h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
-				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds[0])
+				h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds)
 			})
 		})
 	})
@@ -565,95 +464,4 @@ func fakeLifecycle(t *testing.T) *build.Lifecycle {
 	h.AssertNil(t, err)
 
 	return lifecycle
-}
-
-func fakePhaseManager(ops ...func(*FakePhaseManager)) *FakePhaseManager {
-	fakePhaseManager := &FakePhaseManager{
-		ReturnForNew: &FakePhase{},
-	}
-
-	for _, op := range ops {
-		op(fakePhaseManager)
-	}
-
-	return fakePhaseManager
-}
-
-func whichReturnsForNew(phase build.RunnerCleaner) func(*FakePhaseManager) {
-	return func(manager *FakePhaseManager) {
-		manager.ReturnForNew = phase
-	}
-}
-
-func assertIncludeAllExpectedArgPatterns(t *testing.T, receivedArgs []string, expectedPatterns ...[]string) {
-	missingPatterns := [][]string{}
-
-	for _, expectedPattern := range expectedPatterns {
-		if !patternExists(expectedPattern, receivedArgs) {
-			missingPatterns = append(missingPatterns, expectedPattern)
-		}
-	}
-
-	assertSliceEmpty(t,
-		missingPatterns,
-		"Expected the patterns %s to exist in [%s]",
-		missingPatterns,
-		strings.Join(receivedArgs, " "),
-	)
-}
-
-func patternExists(expectedPattern []string, receivedArgs []string) bool {
-	_, missing, _ := stringset.Compare(receivedArgs, expectedPattern)
-	if len(missing) > 0 {
-		return false
-	}
-
-	if len(expectedPattern) == 1 {
-		return true
-	}
-
-	for _, loc := range matchLocations(expectedPattern[0], receivedArgs) {
-		finalElementLoc := loc + len(expectedPattern)
-
-		receivedSubSlice := receivedArgs[loc:finalElementLoc]
-
-		if reflect.DeepEqual(receivedSubSlice, expectedPattern) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func matchLocations(expectedArg string, receivedArgs []string) []int {
-	indices := []int{}
-
-	for i, receivedArg := range receivedArgs {
-		if receivedArg == expectedArg {
-			indices = append(indices, i)
-		}
-	}
-
-	return indices
-}
-
-func assertSliceEmpty(t *testing.T, actual interface{}, msg string, msgArgs ...interface{}) {
-	empty, err := sliceEmpty(actual)
-
-	if err != nil {
-		t.Fatalf("assertSliceNotEmpty error: %s", err.Error())
-	}
-
-	if !empty {
-		t.Fatalf(msg, msgArgs...)
-	}
-}
-
-func sliceEmpty(slice interface{}) (bool, error) {
-	switch reflect.TypeOf(slice).Kind() {
-	case reflect.Slice:
-		return reflect.ValueOf(slice).Len() == 0, nil
-	default:
-		return true, fmt.Errorf("invoked with non slice actual: %v", slice)
-	}
 }
