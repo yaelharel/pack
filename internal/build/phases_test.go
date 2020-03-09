@@ -44,7 +44,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 			fakePhase := &fakes.FakePhase{}
 			fakePhaseManager := fakes.NewFakePhaseManager(fakes.WhichReturnsForNew(fakePhase))
 
-			err := lifecycle.Detect(context.Background(), "test", fakePhaseManager)
+			err := lifecycle.Detect(context.Background(), "test", []string{}, fakePhaseManager)
 			h.AssertNil(t, err)
 
 			h.AssertEq(t, fakePhase.CleanupCallCount, 1)
@@ -55,7 +55,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 			lifecycle := fakeLifecycle(t)
 			fakePhaseManager := fakes.NewFakePhaseManager()
 
-			err := lifecycle.Detect(context.Background(), "test", fakePhaseManager)
+			err := lifecycle.Detect(context.Background(), "test", []string{}, fakePhaseManager)
 			h.AssertNil(t, err)
 
 			h.AssertEq(t, fakePhaseManager.NewCalledWithName, "detector")
@@ -73,11 +73,23 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 			fakePhaseManager := fakes.NewFakePhaseManager()
 			expectedNetworkMode := "some-network-mode"
 
-			err := lifecycle.Detect(context.Background(), expectedNetworkMode, fakePhaseManager)
+			err := lifecycle.Detect(context.Background(), expectedNetworkMode, []string{}, fakePhaseManager)
 			h.AssertNil(t, err)
 
 			h.AssertEq(t, fakePhaseManager.WithNetworkCallCount, 1)
 			h.AssertEq(t, fakePhaseManager.WithNetworkReceived, expectedNetworkMode)
+		})
+
+		it("configures the phase with binds", func() {
+			lifecycle := fakeLifecycle(t)
+			fakePhaseManager := fakes.NewFakePhaseManager()
+			expectedBinds := []string{"some-mount-source:/some-mount-target"}
+
+			err := lifecycle.Detect(context.Background(), "test", expectedBinds, fakePhaseManager)
+			h.AssertNil(t, err)
+
+			h.AssertEq(t, fakePhaseManager.WithBindsCallCount, 1)
+			h.AssertEq(t, fakePhaseManager.WithBindsReceived, expectedBinds)
 		})
 	})
 
@@ -323,7 +335,7 @@ func testPhases(t *testing.T, when spec.G, it spec.S) {
 		it("configures the phase with binds", func() {
 			lifecycle := fakeLifecycle(t)
 			fakePhaseManager := fakes.NewFakePhaseManager()
-			expectedBinds := []string{"some-volume"}
+			expectedBinds := []string{"some-mount-source:/some-mount-target"}
 
 			err := lifecycle.Build(context.Background(), "test", expectedBinds, fakePhaseManager)
 			h.AssertNil(t, err)
