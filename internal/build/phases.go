@@ -21,26 +21,33 @@ type RunnerCleaner interface {
 }
 
 type PhaseManager interface {
-	New(name string, ops ...PhaseOperation) (RunnerCleaner, error)
-	WithArgs(args ...string) PhaseOperation
-	WithNetwork(networkMode string) PhaseOperation
-	WithDaemonAccess() PhaseOperation
-	WithBinds(binds ...string) PhaseOperation
-	WithRegistryAccess(repos ...string) PhaseOperation
-	WithRoot() PhaseOperation
+	New(name string, pcp PhaseConfigProvider) (RunnerCleaner, error)
+	//WithArgs(args ...string) PhaseOperation
+	//WithNetwork(networkMode string) PhaseOperation
+	//WithDaemonAccess() PhaseOperation
+	//WithBinds(binds ...string) PhaseOperation
+	//WithRegistryAccess(repos ...string) PhaseOperation
+	//WithRoot() PhaseOperation
 }
 
 func (l *Lifecycle) Detect(ctx context.Context, networkMode string, volumes []string, phaseManager PhaseManager) error {
-	detect, err := phaseManager.New(
-		"detector",
-		phaseManager.WithArgs(
+	pcp := NewDefaultPhaseConfigProvider(
+		WithArgs(
 			l.withLogLevel(
 				"-app", appDir,
 				"-platform", platformDir,
 			)...,
 		),
-		phaseManager.WithNetwork(networkMode),
-		phaseManager.WithBinds(volumes...),
+		WithNetwork(networkMode),
+		WithBinds(volumes...),
+	)
+
+	// tests will have a way of returning the arguments that phaseManager.New was called with
+	// we'll get access to pcp
+	// tests will call pcp.ContainerConfig() and pcp.HostConfig() and verify that the return value is correct
+	detect, err := phaseManager.New(
+		"detector",
+		pcp,
 	)
 	if err != nil {
 		return err
