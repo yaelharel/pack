@@ -35,5 +35,5 @@ func (f *factory) NewWriter(fileWriter io.WriteCloser) Writer {
 	if f.os == "windows" {
 		return NewWindowsWriter(fileWriter)
 	}
-	return NewLinuxWriter(fileWriter)
+	return tar.NewWriter(fileWriter)
 }
