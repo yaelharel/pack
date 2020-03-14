@@ -15,7 +15,6 @@ require (
 	github.com/google/go-cmp v0.3.0
 	github.com/google/go-containerregistry v0.0.0-20200220215334-221517453cf9
 	github.com/heroku/color v0.0.6
-	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mitchellh/ioprogress v0.0.0-20180201004757-6a23b12fa88e
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
