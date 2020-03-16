@@ -58,7 +58,7 @@ type Stack struct {
 // BuildpackFromRootBlob constructs a buildpack from a blob. It is assumed that the buildpack contents reside at the root of the
 // blob. The constructed buildpack contents will be structured as per the distribution spec (currently
 // a tar with contents under '/cnbs/buildpacks/{ID}/{version}/*').
-func BuildpackFromRootBlob(blob Blob) (Buildpack, error) {
+func BuildpackFromRootBlob(blob Blob, layerWriter) (Buildpack, error) {
 	bpd := BuildpackDescriptor{}
 	rc, err := blob.Open()
 	if err != nil {
@@ -112,6 +112,22 @@ type distBlob struct {
 func (b *distBlob) Open() (io.ReadCloser, error) {
 	return b.openFn(), nil
 }
+
+/*
+ * Two formats for BP blob:
+   - Root format:
+	/
+	/buildpack.toml
+	/bin/
+	/bin/build
+	/bin/detect
+
+   - Dist format:
+	Files/cnb/buildpacks/<bp ID>/<bp ver>
+	Files/cnb/buildpacks/<bp ID>/<bp ver>/bin/
+	...
+	Files/cnb/buildpacks/<bp ID>/<bp ver>/buildpack.toml
+ */
 
 func toDistTar(tw *tar.Writer, bpd BuildpackDescriptor, blob Blob) error {
 	ts := archive.NormalizedDateTime
