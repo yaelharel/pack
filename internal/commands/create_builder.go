@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/buildpacks/pack/internal/config"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -16,9 +17,10 @@ type CreateBuilderFlags struct {
 	BuilderTomlPath string
 	Publish         bool
 	NoPull          bool
+	Registry        string
 }
 
-func CreateBuilder(logger logging.Logger, client PackClient) *cobra.Command {
+func CreateBuilder(logger logging.Logger, cfg config.Config, client PackClient) *cobra.Command {
 	var flags CreateBuilderFlags
 	ctx := createCancellableContext()
 	cmd := &cobra.Command{
@@ -40,6 +42,7 @@ func CreateBuilder(logger logging.Logger, client PackClient) *cobra.Command {
 				Config:      builderConfig,
 				Publish:     flags.Publish,
 				NoPull:      flags.NoPull,
+				Registry:    flags.Registry,
 			}); err != nil {
 				return err
 			}
@@ -50,6 +53,7 @@ func CreateBuilder(logger logging.Logger, client PackClient) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&flags.NoPull, "no-pull", false, "Skip pulling build image before use")
 	cmd.Flags().StringVarP(&flags.BuilderTomlPath, "builder-config", "b", "", "Path to builder TOML file (required)")
+	cmd.Flags().StringVarP(&flags.Registry, "buildpack-registry", "r", cfg.DefaultRegistry, "Buildpack Registry URL")
 	cmd.MarkFlagRequired("builder-config")
 	cmd.Flags().BoolVar(&flags.Publish, "publish", false, "Publish to registry")
 	AddHelpFlag(cmd, "create-builder")
