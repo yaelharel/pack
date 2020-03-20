@@ -3,15 +3,18 @@ package pack
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/Masterminds/semver"
 	"github.com/buildpacks/imgutil"
 	"github.com/pkg/errors"
 
 	pubbldr "github.com/buildpacks/pack/builder"
+	"github.com/buildpacks/pack/internal/archive"
 	"github.com/buildpacks/pack/internal/builder"
 	"github.com/buildpacks/pack/internal/dist"
 	"github.com/buildpacks/pack/internal/image"
+	"github.com/buildpacks/pack/internal/layer"
 	"github.com/buildpacks/pack/internal/style"
 )
 
@@ -72,7 +75,9 @@ func (c *Client) CreateBuilder(ctx context.Context, opts CreateBuilderOptions) e
 			return errors.Wrapf(err, "downloading buildpack from %s", style.Symbol(b.URI))
 		}
 
-		fetchedBp, err := dist.BuildpackFromRootBlob(blob)
+		fetchedBp, err := dist.BuildpackFromRootBlob(blob, func(w io.Writer) (archive.TarWriter, error) {
+			return layer.NewWriterForImage(bldr.Image(), w)
+		})
 		if err != nil {
 			return errors.Wrapf(err, "creating buildpack from %s", style.Symbol(b.URI))
 		}

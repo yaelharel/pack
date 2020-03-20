@@ -13,8 +13,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/buildpacks/pack/internal/layer"
-
 	"github.com/BurntSushi/toml"
 	"github.com/buildpacks/imgutil"
 	"github.com/pkg/errors"
@@ -24,6 +22,7 @@ import (
 	"github.com/buildpacks/pack/internal/api"
 	"github.com/buildpacks/pack/internal/archive"
 	"github.com/buildpacks/pack/internal/dist"
+	"github.com/buildpacks/pack/internal/layer"
 	"github.com/buildpacks/pack/internal/stack"
 	"github.com/buildpacks/pack/internal/style"
 	"github.com/buildpacks/pack/logging"
@@ -52,7 +51,6 @@ const (
 type Builder struct {
 	baseImageName        string
 	image                imgutil.Image
-	layerFactory         layer.Factory
 	lifecycle            Lifecycle
 	lifecycleDescriptor  LifecycleDescriptor
 	additionalBuildpacks []dist.Buildpack
@@ -90,11 +88,6 @@ func New(baseImage imgutil.Image, name string) (*Builder, error) {
 }
 
 func constructBuilder(img imgutil.Image, newName string, metadata Metadata) (*Builder, error) {
-	layerFactory, err := layer.NewFactory(img)
-	if err != nil {
-		return nil, err
-	}
-
 	uid, gid, err := userAndGroupIDs(img)
 	if err != nil {
 		return nil, err
@@ -141,7 +134,6 @@ func constructBuilder(img imgutil.Image, newName string, metadata Metadata) (*Bu
 	return &Builder{
 		baseImageName: baseName,
 		image:         img,
-		layerFactory:  layerFactory,
 		metadata:      metadata,
 		mixins:        mixins,
 		order:         order,
@@ -479,7 +471,10 @@ func (b *Builder) defaultDirsLayer(dest string) (string, error) {
 	}
 	defer fh.Close()
 
-	lw := b.layerFactory.NewWriter(fh)
+	lw, err := layer.NewWriterForImage(b.image, fh)
+	if err != nil {
+		return "", err
+	}
 	defer lw.Close()
 
 	ts := archive.NormalizedDateTime
@@ -538,7 +533,20 @@ func (b *Builder) orderLayer(order dist.Order, dest string) (string, error) {
 	}
 
 	layerTar := filepath.Join(dest, "order.tar")
-	err = archive.CreateSingleFileTar(layerTar, orderPath, contents)
+
+	fh, err := os.Create(layerTar)
+	if err != nil {
+		return "", err
+	}
+	defer fh.Close()
+
+	tw, err := layer.NewWriterForImage(b.image, fh)
+	if err != nil {
+		return "", err
+	}
+	defer tw.Close()
+
+	err = archive.CreateSingleFileTar(tw, orderPath, contents)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to create order.toml layer tar")
 	}
@@ -564,7 +572,20 @@ func (b *Builder) stackLayer(dest string) (string, error) {
 	}
 
 	layerTar := filepath.Join(dest, "stack.tar")
-	err = archive.CreateSingleFileTar(layerTar, stackPath, buf.String())
+
+	fh, err := os.Create(layerTar)
+	if err != nil {
+		return "", err
+	}
+	defer fh.Close()
+
+	tw, err := layer.NewWriterForImage(b.image, fh)
+	if err != nil {
+		return "", err
+	}
+	defer tw.Close()
+
+	err = archive.CreateSingleFileTar(tw, stackPath, buf.String())
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to create stack.toml layer tar")
 	}
@@ -572,7 +593,7 @@ func (b *Builder) stackLayer(dest string) (string, error) {
 	return layerTar, nil
 }
 
-func (b *Builder) embedLifecycleTar(lw layer.Writer) error {
+func (b *Builder) embedLifecycleTar(tw archive.TarWriter) error {
 	var regex = regexp.MustCompile(`^[^/]+/([^/]+)$`)
 
 	lr, err := b.lifecycle.Open()
@@ -595,7 +616,7 @@ func (b *Builder) embedLifecycleTar(lw layer.Writer) error {
 			binaryName := pathMatches[1]
 
 			header.Name = lifecycleDir + "/" + binaryName
-			err = lw.WriteHeader(header)
+			err = tw.WriteHeader(header)
 			if err != nil {
 				return errors.Wrapf(err, "failed to write header for '%s'", header.Name)
 			}
@@ -605,7 +626,7 @@ func (b *Builder) embedLifecycleTar(lw layer.Writer) error {
 				return errors.Wrapf(err, "failed to read contents of '%s'", header.Name)
 			}
 
-			_, err = lw.Write(buf)
+			_, err = tw.Write(buf)
 			if err != nil {
 				return errors.Wrapf(err, "failed to write contents to '%s'", header.Name)
 			}
@@ -622,7 +643,10 @@ func (b *Builder) envLayer(dest string, env map[string]string) (string, error) {
 	}
 	defer fh.Close()
 
-	lw := b.layerFactory.NewWriter(fh)
+	lw, err := layer.NewWriterForImage(b.image, fh)
+	if err != nil {
+		return "", err
+	}
 	defer lw.Close()
 
 	for k, v := range env {
@@ -649,7 +673,10 @@ func (b *Builder) lifecycleLayer(dest string) (string, error) {
 	}
 	defer fh.Close()
 
-	lw := b.layerFactory.NewWriter(fh)
+	lw, err := layer.NewWriterForImage(b.image, fh)
+	if err != nil {
+		return "", nil
+	}
 	defer lw.Close()
 
 	if err := lw.WriteHeader(&tar.Header{

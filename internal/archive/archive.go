@@ -21,6 +21,12 @@ func init() {
 	NormalizedDateTime = time.Date(1980, time.January, 1, 0, 0, 1, 0, time.UTC)
 }
 
+type TarWriter interface {
+	WriteHeader(hdr *tar.Header) error
+	Write(b []byte) (int, error)
+	Close() error
+}
+
 func ReadDirAsTar(srcDir, basePath string, uid, gid int, mode int64, normalizeModTime bool) io.ReadCloser {
 	return GenerateTar(func(tw TarWriter) error {
 		return WriteDirToTar(tw, srcDir, basePath, uid, gid, mode, normalizeModTime)
@@ -33,34 +39,26 @@ func ReadZipAsTar(srcPath, basePath string, uid, gid int, mode int64, normalizeM
 	})
 }
 
-type TarWriter interface {
-	WriteHeader(hdr *tar.Header) error
-	Write(b []byte) (int, error)
-	Close() error
-}
-
-type TarWriterFactory interface {
-	NewWriter(w io.Writer) TarWriter
-}
-
-type DefaultTarWriterFactory struct {}
-func (f *DefaultTarWriterFactory) NewWriter(w io.Writer) TarWriter {
-	return tar.NewWriter(w)
-}
-
-func GenerateTar(gen func(TarWriter) error) io.ReadCloser {
-	return GenerateTarWithWriter(gen, &DefaultTarWriterFactory{})
+func GenerateTar(genFn func(TarWriter) error) io.ReadCloser {
+	return GenerateTarWithWriter(genFn, func(w io.Writer) (TarWriter, error) {
+		// Use non-OS-specific tar writer by default
+		return tar.NewWriter(w), nil
+	})
 }
 
 // GenerateTar returns a reader to a tar from a generator function. Note that the
 // generator will not fully execute until the reader is fully read from. Any errors
 // returned by the generator will be returned when reading the reader.
-func GenerateTarWithWriter(gen func(TarWriter) error, twFactory TarWriterFactory) io.ReadCloser {
+func GenerateTarWithWriter(genFn func(TarWriter) error, writerFn func(io.Writer) (TarWriter, error)) io.ReadCloser {
 	errChan := make(chan error)
 	pr, pw := io.Pipe()
 
 	go func() {
-		tw := twFactory.NewWriter(pw)
+		tw, err := writerFn(pw)
+		if err != nil {
+			errChan <- err
+			return
+		}
 
 		defer func() {
 			if r := recover(); r != nil {
@@ -69,7 +67,7 @@ func GenerateTarWithWriter(gen func(TarWriter) error, twFactory TarWriterFactory
 			}
 		}()
 
-		err := gen(tw)
+		err = genFn(tw)
 
 		closeErr := tw.Close()
 		closeErr = aggregateError(closeErr, pw.CloseWithError(err))
@@ -119,25 +117,11 @@ func CreateSingleFileTarReader(path, txt string) (io.Reader, error) {
 	return bytes.NewReader(buf.Bytes()), nil
 }
 
-func CreateSingleFileTar(tarFile, path, txt string) error {
+func CreateSingleFileTar(tw TarWriter, path, txt string) error {
 	tarBuilder := TarBuilder{}
 	tarBuilder.AddFile(path, 0644, NormalizedDateTime, []byte(txt))
-	return tarBuilder.WriteToPath(tarFile)
-}
-
-func AddFileToTar(tw TarWriter, path string, txt string) error {
-	if err := tw.WriteHeader(&tar.Header{
-		Name:    path,
-		Size:    int64(len(txt)),
-		Mode:    0644,
-		ModTime: NormalizedDateTime,
-	}); err != nil {
-		return err
-	}
-	if _, err := tw.Write([]byte(txt)); err != nil {
-		return err
-	}
-	return nil
+	_, err := tarBuilder.WriteToTarWriter(tw)
+	return err
 }
 
 var ErrEntryNotExist = errors.New("not exist")

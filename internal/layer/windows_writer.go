@@ -12,10 +12,10 @@ type WindowsWriter struct {
 	writtenParentPaths map[string]bool
 }
 
-func NewWindowsWriter(dataWriter io.WriteCloser) *WindowsWriter {
+func NewWindowsWriter(fileWriter io.Writer) *WindowsWriter {
 	return &WindowsWriter{
-		tar.NewWriter(dataWriter),
-		map[string]bool{},
+		tarWriter:          tar.NewWriter(fileWriter),
+		writtenParentPaths: map[string]bool{},
 	}
 }
 
@@ -57,6 +57,9 @@ func (w *WindowsWriter) writeParentPaths(childPath string) error {
 }
 
 func (w *WindowsWriter) Close() error {
+	if err := w.initializeLayer(); err != nil {
+		return err
+	}
 	return w.tarWriter.Close()
 }
 

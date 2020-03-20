@@ -7,33 +7,29 @@ import (
 	"github.com/buildpacks/imgutil"
 )
 
-//go:generate mockgen -package testmocks -destination testmocks/mock_layer_factory.go github.com/buildpacks/pack/internal/layers Factory
-type Factory interface {
-	NewWriter(fileWriter io.WriteCloser) Writer
-}
-
-//go:generate mockgen -package testmocks -destination testmocks/mock_layer_writer.go github.com/buildpacks/pack/internal/layers Writer
-type Writer interface {
-	Write(content []byte) (int, error)
-	WriteHeader(header *tar.Header) error
+type TarWriter interface {
+	WriteHeader(hdr *tar.Header) error
+	Write(b []byte) (int, error)
 	Close() error
 }
 
-type factory struct {
-	os string
-}
-
-func NewFactory(image imgutil.Image) (Factory, error) {
+// TODO: Move to method on `imgutil.Image`
+func NewWriterForImage(image imgutil.Image, fileWriter io.Writer) (TarWriter, error) {
 	os, err := image.OS()
 	if err != nil {
 		return nil, err
 	}
-	return &factory{os}, nil
+	if os == "windows" {
+		return NewWindowsWriter(fileWriter), nil
+	}
+	return tar.NewWriter(fileWriter), nil
 }
 
-func (f *factory) NewWriter(fileWriter io.WriteCloser) Writer {
-	if f.os == "windows" {
-		return NewWindowsWriter(fileWriter)
-	}
-	return tar.NewWriter(fileWriter)
-}
+/*
+imgutil      lifecycle
+    ^          ^
+     \        /
+        pack
+
+
+ */

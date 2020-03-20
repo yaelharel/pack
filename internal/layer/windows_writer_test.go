@@ -95,15 +95,19 @@ func testWindowsWriter(t *testing.T, when spec.G, it spec.S) {
 
 				th, _ := tr.Next()
 				h.AssertEq(t, th.Name, "Files")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
 
 				th, _ = tr.Next()
 				h.AssertEq(t, th.Name, "Hives")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
 
 				th, _ = tr.Next()
 				h.AssertEq(t, th.Name, "Files/cnb")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
 
 				th, _ = tr.Next()
 				h.AssertEq(t, th.Name, "Files/cnb/my-file")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeReg))
 
 				_, err = tr.Next()
 				h.AssertTrue(t, err == io.EOF)
@@ -133,15 +137,19 @@ func testWindowsWriter(t *testing.T, when spec.G, it spec.S) {
 
 				th, _ := tr.Next()
 				h.AssertEq(t, th.Name, "Files")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
 
 				th, _ = tr.Next()
 				h.AssertEq(t, th.Name, "Hives")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
 
 				th, _ = tr.Next()
 				h.AssertEq(t, th.Name, "Files/cnb")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
 
 				th, _ = tr.Next()
 				h.AssertEq(t, th.Name, "Files/cnb/my-file")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeReg))
 
 				_, err = tr.Next()
 				h.AssertTrue(t, err == io.EOF)
@@ -170,15 +178,19 @@ func testWindowsWriter(t *testing.T, when spec.G, it spec.S) {
 
 				th, _ := tr.Next()
 				h.AssertEq(t, th.Name, "Files")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
 
 				th, _ = tr.Next()
 				h.AssertEq(t, th.Name, "Hives")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
 
 				th, _ = tr.Next()
 				h.AssertEq(t, th.Name, "Files/cnb")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
 
 				th, _ = tr.Next()
 				h.AssertEq(t, th.Name, "Files/cnb/my-file")
+				h.AssertEq(t, th.Typeflag, byte(tar.TypeReg))
 
 				_, err = tr.Next()
 				h.AssertTrue(t, err == io.EOF)
@@ -186,32 +198,32 @@ func testWindowsWriter(t *testing.T, when spec.G, it spec.S) {
 		})
 	})
 
-	//when("#Close", func() {
-	//	it("writes required parent dirs on empty image", func() {
-	//		var err error
-	//
-	//		f, err := ioutil.TempFile("", "windows-writer.tar")
-	//		h.AssertNil(t, err)
-	//		defer func() { f.Close(); os.Remove(f.Name()) }()
-	//
-	//		lw := layer.NewWindowsWriter(f)
-	//
-	//		err = lw.Close()
-	//		h.AssertNil(t, err)
-	//
-	//		f.Seek(0, 0)
-	//		tr := tar.NewReader(f)
-	//
-	//		th, _ := tr.Next()
-	//		h.AssertEq(t, th.Name, "Files")
-	//      h.AssertEq(t, th.Typeflag, byte(tar.TypeReg))
-	//
-	//		th, _ = tr.Next()
-	//		h.AssertEq(t, th.Name, "Hives")
-	//      h.AssertEq(t, th.Typeflag, byte(tar.TypeReg))
-	//
-	//		_, err = tr.Next()
-	//		h.AssertTrue(t, err == io.EOF)
-	//	})
-	//})
+	when("#Close", func() {
+		it("writes required parent dirs on empty image", func() {
+			var err error
+
+			f, err := ioutil.TempFile("", "windows-writer.tar")
+			h.AssertNil(t, err)
+			defer func() { f.Close(); os.Remove(f.Name()) }()
+
+			lw := layer.NewWindowsWriter(f)
+
+			err = lw.Close()
+			h.AssertNil(t, err)
+
+			f.Seek(0, 0)
+			tr := tar.NewReader(f)
+
+			th, _ := tr.Next()
+			h.AssertEq(t, th.Name, "Files")
+			h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
+
+			th, _ = tr.Next()
+			h.AssertEq(t, th.Name, "Hives")
+			h.AssertEq(t, th.Typeflag, byte(tar.TypeDir))
+
+			_, err = tr.Next()
+			h.AssertTrue(t, err == io.EOF)
+		})
+	})
 }

@@ -58,7 +58,7 @@ type Stack struct {
 // BuildpackFromRootBlob constructs a buildpack from a blob. It is assumed that the buildpack contents reside at the root of the
 // blob. The constructed buildpack contents will be structured as per the distribution spec (currently
 // a tar with contents under '/cnbs/buildpacks/{ID}/{version}/*').
-func BuildpackFromRootBlob(blob Blob, layerWriter) (Buildpack, error) {
+func BuildpackFromRootBlob(blob Blob, tarWriterFn func(io.Writer) (archive.TarWriter, error)) (Buildpack, error) {
 	bpd := BuildpackDescriptor{}
 	rc, err := blob.Open()
 	if err != nil {
@@ -84,9 +84,12 @@ func BuildpackFromRootBlob(blob Blob, layerWriter) (Buildpack, error) {
 
 	db := &distBlob{
 		openFn: func() io.ReadCloser {
-			return archive.GenerateTar(func(tw *tar.Writer) error {
-				return toDistTar(tw, bpd, blob)
-			})
+			return archive.GenerateTarWithWriter(
+				func(tw archive.TarWriter) error {
+					return toDistTar(tw, bpd, blob)
+				},
+				tarWriterFn,
+			)
 		},
 	}
 
@@ -123,13 +126,14 @@ func (b *distBlob) Open() (io.ReadCloser, error) {
 	/bin/detect
 
    - Dist format:
+	Hives/
 	Files/cnb/buildpacks/<bp ID>/<bp ver>
 	Files/cnb/buildpacks/<bp ID>/<bp ver>/bin/
 	...
-	Files/cnb/buildpacks/<bp ID>/<bp ver>/buildpack.toml
- */
+	File/cnb/buildpacks/<bp ID>/<bp ver>/buildpack.toml
+*/
 
-func toDistTar(tw *tar.Writer, bpd BuildpackDescriptor, blob Blob) error {
+func toDistTar(tw archive.TarWriter, bpd BuildpackDescriptor, blob Blob) error {
 	ts := archive.NormalizedDateTime
 
 	if err := tw.WriteHeader(&tar.Header{

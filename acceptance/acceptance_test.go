@@ -253,9 +253,9 @@ func testAcceptance(t *testing.T, when spec.G, it spec.S, packFixturesDir, packP
 				})
 			h.AssertNil(t, err)
 
-			suiteManager.RegisterCleanUp("remove-stack-images", func() error {
-				return h.DockerRmi(dockerCli, runImage, buildImage, value)
-			})
+			// suiteManager.RegisterCleanUp("remove-stack-images", func() error {
+			// 	return h.DockerRmi(dockerCli, runImage, buildImage, value)
+			// })
 
 			runImageMirror = value
 		})

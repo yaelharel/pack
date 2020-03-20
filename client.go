@@ -36,12 +36,12 @@ type ImageFactory interface {
 }
 
 type Client struct {
-	logger       logging.Logger
-	imageFetcher ImageFetcher
-	downloader   Downloader
-	lifecycle    Lifecycle
-	docker       dockerClient.CommonAPIClient
-	imageFactory ImageFactory
+	logger           logging.Logger
+	imageFetcher     ImageFetcher
+	downloader       Downloader
+	lifecycle        Lifecycle
+	docker           dockerClient.CommonAPIClient
+	imageFactory     ImageFactory
 }
 
 type ClientOption func(c *Client)

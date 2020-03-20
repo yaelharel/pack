@@ -28,6 +28,7 @@ import (
 	"github.com/sclevine/spec/report"
 
 	"github.com/buildpacks/pack/internal/api"
+	"github.com/buildpacks/pack/internal/archive"
 	"github.com/buildpacks/pack/internal/blob"
 	"github.com/buildpacks/pack/internal/builder"
 	"github.com/buildpacks/pack/internal/buildpackage"
@@ -176,6 +177,7 @@ func testBuild(t *testing.T, when spec.G, it spec.S) {
 			downloader:   blob.NewDownloader(logger, dlCacheDir),
 			lifecycle:    fakeLifecycle,
 			docker:       docker,
+			tarWriterFactory: &archive.DefaultTarWriterFactory{},
 		}
 	})
 
